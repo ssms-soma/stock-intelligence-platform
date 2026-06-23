@@ -1,8 +1,18 @@
 import { useState } from "react";
+import {
+  LineChart,
+  Line,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  ResponsiveContainer,
+} from "recharts";
 
 function App() {
   const [ticker, setTicker] = useState("");
   const [stockData, setStockData] = useState(null);
+  const [historyData, setHistoryData] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
@@ -15,18 +25,27 @@ function App() {
     setLoading(true);
     setError("");
     setStockData(null);
+    setHistoryData([]);
 
     try {
-      const response = await fetch(
-        `http://127.0.0.1:8000/api/stocks/${ticker.trim()}`
-      );
+      const trimmedTicker = ticker.trim();
 
-      if (!response.ok) {
+      const [stockResponse, historyResponse] = await Promise.all([
+        fetch(`http://127.0.0.1:8000/api/stocks/${trimmedTicker}`),
+        fetch(
+          `http://127.0.0.1:8000/api/stocks/${trimmedTicker}/history?period=6mo`
+        ),
+      ]);
+
+      if (!stockResponse.ok || !historyResponse.ok) {
         throw new Error("Failed to fetch stock data");
       }
 
-      const data = await response.json();
-      setStockData(data);
+      const stock = await stockResponse.json();
+      const history = await historyResponse.json();
+
+      setStockData(stock);
+      setHistoryData(history);
     } catch (err) {
       setError("Unable to fetch stock data. Check ticker or backend.");
     } finally {
@@ -68,6 +87,28 @@ function App() {
           <p><strong>52 Week Low:</strong> {stockData.fifty_two_week_low ?? "N/A"}</p>
           <p><strong>Volume:</strong> {stockData.volume ?? "N/A"}</p>
           <p><strong>Sector:</strong> {stockData.sector ?? "N/A"}</p>
+        </div>
+      )}
+
+      {historyData.length > 0 && (
+        <div style={{ marginTop: "2rem", height: "350px" }}>
+          <h2>6 Month Price History</h2>
+
+          <ResponsiveContainer width="100%" height="100%">
+            <LineChart data={historyData}>
+              <CartesianGrid strokeDasharray="3 3" />
+              <XAxis dataKey="date" />
+              <YAxis domain={["auto", "auto"]} />
+              <Tooltip />
+              <Line
+                type="monotone"
+                dataKey="close"
+                stroke="#2563eb"
+                strokeWidth={2}
+                dot={false}
+              />
+            </LineChart>
+          </ResponsiveContainer>
         </div>
       )}
     </div>
