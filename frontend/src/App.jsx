@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   LineChart,
   Line,
@@ -13,8 +13,13 @@ function App() {
   const [ticker, setTicker] = useState("");
   const [stockData, setStockData] = useState(null);
   const [historyData, setHistoryData] = useState([]);
+  const [newsData, setNewsData] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+
+  useEffect(() => {
+    console.log("newsData state:", newsData);
+  }, [newsData]);
 
   const fetchStockData = async () => {
     if (!ticker.trim()) {
@@ -26,6 +31,7 @@ function App() {
     setError("");
     setStockData(null);
     setHistoryData([]);
+    setNewsData([]);
 
     try {
       const trimmedTicker = ticker.trim();
@@ -41,13 +47,29 @@ function App() {
         throw new Error("Failed to fetch stock data");
       }
 
-      const stock = await stockResponse.json();
+      const data = await stockResponse.json();
       const history = await historyResponse.json();
+      const newsQuery = data.company_name || ticker.trim();
 
-      setStockData(stock);
+      setStockData(data);
       setHistoryData(history);
+      const newsResponse = await fetch(
+        `http://127.0.0.1:8000/api/news/${encodeURIComponent(newsQuery)}?page_size=5`
+      );
+
+      console.log("News API response:", newsResponse);
+
+      if (!newsResponse.ok) {
+        throw new Error(`Failed to fetch news: ${newsResponse.status}`);
+      }
+
+      const news = await newsResponse.json();
+
+      console.log("Parsed news API response:", news);
+      setNewsData(Array.isArray(news) ? news : []);
     } catch (err) {
-      setError("Unable to fetch stock data. Check ticker or backend.");
+      console.error("Fetch error:", err);
+      setError("Unable to fetch stock data or news. Check ticker or backend.");
     } finally {
       setLoading(false);
     }
@@ -110,6 +132,39 @@ function App() {
             </LineChart>
           </ResponsiveContainer>
         </div>
+      )}
+
+      {Array.isArray(newsData) && newsData.length > 0 && (
+        <div style={{ marginTop: "3rem" }}>
+          <h2>Latest News</h2>
+
+          {newsData.map((article) => (
+            <div
+              key={article.url}
+              style={{
+                border: "1px solid #ccc",
+                padding: "1rem",
+                marginBottom: "1rem",
+              }}
+            >
+              <h3>
+                <a href={article.url} target="_blank" rel="noreferrer">
+                  {article.title}
+                </a>
+              </h3>
+
+              <p><strong>Source:</strong> {article.source ?? "N/A"}</p>
+              <p><strong>Published:</strong> {article.published_at ?? "N/A"}</p>
+              <p><strong>Description:</strong> {article.description ?? "N/A"}</p>
+              <p><strong>Sentiment:</strong> {article.sentiment ? article.sentiment.charAt(0).toUpperCase() + article.sentiment.slice(1) : "N/A"}</p>
+              <p><strong>Polarity:</strong> {article.polarity ?? "N/A"}</p>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {stockData && Array.isArray(newsData) && newsData.length === 0 && !loading && (
+        <p style={{ marginTop: "3rem" }}>No news articles found for this stock.</p>
       )}
     </div>
   );
