@@ -1,50 +1,116 @@
-function StockOverviewCard({ stockData }) {
-  return (
-    <div
-      style={{
-        marginTop: "2rem",
-        border: "1px solid #dbe3ef",
-        padding: "1rem",
-        background: "#ffffff",
-        color: "#475569",
-      }}
-    >
-      <h2 style={{ color: "#0f172a" }}>
-        {stockData.company_name || stockData.ticker}
-      </h2>
+function renderValue(value, fallback = "N/A") {
+  if (value === null || value === undefined || value === "") return fallback;
+  if (
+    typeof value === "string" ||
+    typeof value === "number" ||
+    typeof value === "boolean"
+  ) {
+    return value;
+  }
+  return fallback;
+}
 
-      <p>
-        <strong style={{ color: "#0f172a" }}>Ticker:</strong> {stockData.ticker}
-      </p>
-      <p>
-        <strong style={{ color: "#0f172a" }}>Current Price:</strong>{" "}
-        {stockData.current_price ?? "N/A"}
-      </p>
-      <p>
-        <strong style={{ color: "#0f172a" }}>Market Cap:</strong>{" "}
-        {stockData.market_cap ?? "N/A"}
-      </p>
-      <p>
-        <strong style={{ color: "#0f172a" }}>P/E Ratio:</strong>{" "}
-        {stockData.pe_ratio ?? "N/A"}
-      </p>
-      <p>
-        <strong style={{ color: "#0f172a" }}>52 Week High:</strong>{" "}
-        {stockData.fifty_two_week_high ?? "N/A"}
-      </p>
-      <p>
-        <strong style={{ color: "#0f172a" }}>52 Week Low:</strong>{" "}
-        {stockData.fifty_two_week_low ?? "N/A"}
-      </p>
-      <p>
-        <strong style={{ color: "#0f172a" }}>Volume:</strong>{" "}
-        {stockData.volume ?? "N/A"}
-      </p>
-      <p>
-        <strong style={{ color: "#0f172a" }}>Sector:</strong>{" "}
-        {stockData.sector ?? "N/A"}
-      </p>
+function formatNumber(value, decimals = 2) {
+  const numberValue = Number(value);
+
+  if (!Number.isFinite(numberValue)) {
+    return renderValue(value);
+  }
+
+  return numberValue.toLocaleString(undefined, {
+    minimumFractionDigits: decimals,
+    maximumFractionDigits: decimals,
+  });
+}
+
+function formatCompactNumber(value) {
+  const numberValue = Number(value);
+
+  if (!Number.isFinite(numberValue)) {
+    return renderValue(value);
+  }
+
+  const absValue = Math.abs(numberValue);
+
+  if (absValue >= 1_000_000_000_000) {
+    return `${formatNumber(numberValue / 1_000_000_000_000, 2)}T`;
+  }
+
+  if (absValue >= 1_000_000_000) {
+    return `${formatNumber(numberValue / 1_000_000_000, 1)}B`;
+  }
+
+  if (absValue >= 1_000_000) {
+    return `${formatNumber(numberValue / 1_000_000, 1)}M`;
+  }
+
+  if (absValue >= 1_000) {
+    return `${formatNumber(numberValue / 1_000, 1)}K`;
+  }
+
+  return formatNumber(numberValue, 0);
+}
+
+function formatPrice(value) {
+  const numberValue = Number(value);
+
+  if (!Number.isFinite(numberValue)) {
+    return renderValue(value);
+  }
+
+  return formatNumber(numberValue, 2);
+}
+
+function MetricItem({ label, value }) {
+  return (
+    <div className="stock-metric-tile">
+      <span>{label}</span>
+      <strong>{value}</strong>
     </div>
+  );
+}
+
+function StockOverviewCard({ stockData }) {
+  const companyName = renderValue(stockData?.company_name, stockData?.ticker);
+  const ticker = renderValue(stockData?.ticker);
+  const sector = renderValue(stockData?.sector);
+
+  return (
+    <section className="stock-overview-card">
+      <div className="stock-overview-header">
+        <div>
+          <p className="stock-overview-eyebrow">Stock Overview</p>
+          <h2>{companyName}</h2>
+          <div className="stock-overview-meta">
+            <span>{ticker}</span>
+            <span>{sector}</span>
+          </div>
+        </div>
+
+        <div className="stock-price-block">
+          <span>Current Price</span>
+          <strong>{formatPrice(stockData?.current_price)}</strong>
+        </div>
+      </div>
+
+      <div className="stock-metric-grid">
+        <MetricItem
+          label="Market Cap"
+          value={formatCompactNumber(stockData?.market_cap)}
+        />
+        <MetricItem label="P/E Ratio" value={formatNumber(stockData?.pe_ratio)} />
+        <MetricItem
+          label="52-Week High"
+          value={formatPrice(stockData?.fifty_two_week_high)}
+        />
+        <MetricItem
+          label="52-Week Low"
+          value={formatPrice(stockData?.fifty_two_week_low)}
+        />
+        <MetricItem label="Volume" value={formatCompactNumber(stockData?.volume)} />
+        <MetricItem label="Sector" value={sector} />
+      </div>
+    </section>
   );
 }
 

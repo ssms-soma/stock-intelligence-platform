@@ -11,6 +11,11 @@ import PriceChart from "../components/PriceChart";
 import RelatedCompanies from "../components/RelatedCompanies";
 import ResearchSummary from "../components/ResearchSummary";
 import SearchBar from "../components/SearchBar";
+import {
+  SkeletonCard,
+  SkeletonChart,
+  SkeletonNewsList,
+} from "../components/SkeletonLoader";
 import StockOverviewCard from "../components/StockOverviewCard";
 
 function Dashboard() {
@@ -255,13 +260,13 @@ function Dashboard() {
         </header>
 
         <main style={{ padding: "0 2rem 2rem" }}>
-          {loading && (
-            <p style={{ marginTop: "2rem" }}>Loading stock data...</p>
-          )}
-
           {error && <p style={{ marginTop: "2rem", color: "red" }}>{error}</p>}
 
+          {loading && !stockData && <SkeletonCard />}
+
           {stockData && <StockOverviewCard stockData={stockData} />}
+
+          {loading && historyData.length === 0 && <SkeletonChart />}
 
           {historyData.length > 0 && (
             <PriceChart
@@ -288,6 +293,8 @@ function Dashboard() {
           {Array.isArray(newsData) && newsData.length > 0 && (
             <NewsSection newsData={newsData} />
           )}
+
+          {loading && newsData.length === 0 && <SkeletonNewsList />}
 
           {stockData &&
             Array.isArray(newsData) &&

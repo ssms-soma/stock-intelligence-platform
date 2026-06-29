@@ -60,7 +60,7 @@ function formatPrice(value) {
   const numberValue = Number(value);
 
   if (!Number.isFinite(numberValue)) {
-    return "Loading";
+    return "Loading...";
   }
 
   return numberValue.toLocaleString(undefined, {
@@ -77,6 +77,20 @@ function formatTrendValue(value) {
   }
 
   return `${numberValue >= 0 ? "+" : ""}${numberValue.toFixed(2)}`;
+}
+
+function formatTrendText(trend) {
+  if (
+    !trend ||
+    !Number.isFinite(Number(trend.change)) ||
+    !Number.isFinite(Number(trend.changePercent))
+  ) {
+    return "Trend pending";
+  }
+
+  return `${formatTrendValue(trend.change)} (${formatTrendValue(
+    trend.changePercent
+  )}%)`;
 }
 
 function TrendMarker({ direction }) {
@@ -186,8 +200,7 @@ function RelatedCompanies({ ticker, onTickerSelect }) {
                 style={{ color: trendColor }}
               >
                 <TrendMarker direction={direction} />
-                {formatTrendValue(stock.trend?.change)} (
-                {formatTrendValue(stock.trend?.changePercent)}%)
+                {formatTrendText(stock.trend)}
               </span>
             </button>
           );
