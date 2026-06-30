@@ -1,7 +1,12 @@
 import { useEffect, useState } from "react";
+import { fetchCompanyNews } from "../api/newsApi";
 import SentimentBadge from "./SentimentBadge";
 
-const HEADLINES_URL = "/api/news/stock%20market?page_size=5";
+function devWarn(...args) {
+  if (import.meta.env.DEV) {
+    console.warn(...args);
+  }
+}
 
 function MarketHeadlines() {
   const [headlines, setHeadlines] = useState([]);
@@ -11,16 +16,10 @@ function MarketHeadlines() {
   useEffect(() => {
     async function fetchHeadlines() {
       try {
-        const response = await fetch(HEADLINES_URL);
-
-        if (!response.ok) {
-          throw new Error("Failed to fetch market headlines");
-        }
-
-        const data = await response.json();
+        const data = await fetchCompanyNews("stock market", 5);
         setHeadlines(Array.isArray(data) ? data : []);
       } catch (error) {
-        console.warn("Market headlines fetch error:", error);
+        devWarn("Market headlines fetch error:", error);
         setFailed(true);
       } finally {
         setLoading(false);

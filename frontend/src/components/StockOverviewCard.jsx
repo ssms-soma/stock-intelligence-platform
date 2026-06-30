@@ -1,3 +1,9 @@
+import {
+  formatCurrencyByTicker,
+  formatMarketLabel,
+  getMarketInfo,
+} from "../utils/marketUtils";
+
 function renderValue(value, fallback = "N/A") {
   if (value === null || value === undefined || value === "") return fallback;
   if (
@@ -11,6 +17,10 @@ function renderValue(value, fallback = "N/A") {
 }
 
 function formatNumber(value, decimals = 2) {
+  if (value === null || value === undefined || value === "") {
+    return "N/A";
+  }
+
   const numberValue = Number(value);
 
   if (!Number.isFinite(numberValue)) {
@@ -24,6 +34,10 @@ function formatNumber(value, decimals = 2) {
 }
 
 function formatCompactNumber(value) {
+  if (value === null || value === undefined || value === "") {
+    return "N/A";
+  }
+
   const numberValue = Number(value);
 
   if (!Number.isFinite(numberValue)) {
@@ -51,16 +65,6 @@ function formatCompactNumber(value) {
   return formatNumber(numberValue, 0);
 }
 
-function formatPrice(value) {
-  const numberValue = Number(value);
-
-  if (!Number.isFinite(numberValue)) {
-    return renderValue(value);
-  }
-
-  return formatNumber(numberValue, 2);
-}
-
 function MetricItem({ label, value }) {
   return (
     <div className="stock-metric-tile">
@@ -74,6 +78,8 @@ function StockOverviewCard({ stockData }) {
   const companyName = renderValue(stockData?.company_name, stockData?.ticker);
   const ticker = renderValue(stockData?.ticker);
   const sector = renderValue(stockData?.sector);
+  const marketInfo = getMarketInfo(stockData?.ticker);
+  const marketLabel = formatMarketLabel(stockData?.ticker);
 
   return (
     <section className="stock-overview-card">
@@ -83,13 +89,21 @@ function StockOverviewCard({ stockData }) {
           <h2>{companyName}</h2>
           <div className="stock-overview-meta">
             <span>{ticker}</span>
+            <span>
+              {marketLabel}
+              {" \u00B7 "}
+              {marketInfo.currency}
+            </span>
+            <span>{marketInfo.countryLabel}</span>
             <span>{sector}</span>
           </div>
         </div>
 
         <div className="stock-price-block">
           <span>Current Price</span>
-          <strong>{formatPrice(stockData?.current_price)}</strong>
+          <strong>
+            {formatCurrencyByTicker(stockData?.current_price, stockData?.ticker)}
+          </strong>
         </div>
       </div>
 
@@ -101,11 +115,17 @@ function StockOverviewCard({ stockData }) {
         <MetricItem label="P/E Ratio" value={formatNumber(stockData?.pe_ratio)} />
         <MetricItem
           label="52-Week High"
-          value={formatPrice(stockData?.fifty_two_week_high)}
+          value={formatCurrencyByTicker(
+            stockData?.fifty_two_week_high,
+            stockData?.ticker
+          )}
         />
         <MetricItem
           label="52-Week Low"
-          value={formatPrice(stockData?.fifty_two_week_low)}
+          value={formatCurrencyByTicker(
+            stockData?.fifty_two_week_low,
+            stockData?.ticker
+          )}
         />
         <MetricItem label="Volume" value={formatCompactNumber(stockData?.volume)} />
         <MetricItem label="Sector" value={sector} />

@@ -7,6 +7,7 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
+import { formatCurrencyByTicker } from "../utils/marketUtils";
 
 const PERIOD_OPTIONS = [
   { label: "1D", value: "1d" },
@@ -107,8 +108,9 @@ function formatCloseValue(value) {
   });
 }
 
-function PriceChart({ historyData, activePeriod, onPeriodChange }) {
+function PriceChart({ historyData, activePeriod, onPeriodChange, error, ticker }) {
   const axisSettings = getAxisSettings(activePeriod);
+  const hasHistory = Array.isArray(historyData) && historyData.length > 0;
 
   return (
     <div
@@ -156,32 +158,54 @@ function PriceChart({ historyData, activePeriod, onPeriodChange }) {
       </div>
 
       <div style={{ height: "350px" }}>
-        <ResponsiveContainer width="100%" height="100%">
-          <LineChart data={historyData} margin={{ right: 12, left: 4, bottom: 8 }}>
-            <CartesianGrid strokeDasharray="3 3" />
-            <XAxis
-              dataKey="date"
-              tickFormatter={(value) => formatAxisDate(value, activePeriod)}
-              interval={axisSettings.interval}
-              tickCount={axisSettings.tickCount}
-              minTickGap={axisSettings.minTickGap}
-              tick={{ fontSize: 12, fill: "#64748b" }}
-              tickLine={false}
-            />
-            <YAxis domain={["auto", "auto"]} tick={{ fontSize: 12, fill: "#64748b" }} />
-            <Tooltip
-              labelFormatter={formatTooltipDate}
-              formatter={(value) => [formatCloseValue(value), "Close"]}
-            />
-            <Line
-              type="monotone"
-              dataKey="close"
-              stroke="#2563eb"
-              strokeWidth={2}
-              dot={false}
-            />
-          </LineChart>
-        </ResponsiveContainer>
+        {hasHistory ? (
+          <ResponsiveContainer width="100%" height="100%">
+            <LineChart data={historyData} margin={{ right: 12, left: 4, bottom: 8 }}>
+              <CartesianGrid strokeDasharray="3 3" />
+              <XAxis
+                dataKey="date"
+                tickFormatter={(value) => formatAxisDate(value, activePeriod)}
+                interval={axisSettings.interval}
+                tickCount={axisSettings.tickCount}
+                minTickGap={axisSettings.minTickGap}
+                tick={{ fontSize: 12, fill: "#64748b" }}
+                tickLine={false}
+              />
+              <YAxis domain={["auto", "auto"]} tick={{ fontSize: 12, fill: "#64748b" }} />
+              <Tooltip
+                labelFormatter={formatTooltipDate}
+                formatter={(value) => [
+                  ticker
+                    ? formatCurrencyByTicker(value, ticker)
+                    : formatCloseValue(value),
+                  "Close",
+                ]}
+              />
+              <Line
+                type="monotone"
+                dataKey="close"
+                stroke="#2563eb"
+                strokeWidth={2}
+                dot={false}
+              />
+            </LineChart>
+          </ResponsiveContainer>
+        ) : (
+          <div
+            style={{
+              height: "100%",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              border: "1px dashed #cbd5e1",
+              color: "#64748b",
+              textAlign: "center",
+              padding: "1rem",
+            }}
+          >
+            {error || "Price history is temporarily unavailable."}
+          </div>
+        )}
       </div>
     </div>
   );

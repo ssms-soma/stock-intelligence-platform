@@ -1,15 +1,32 @@
+import { getOrFetch } from "./apiCache";
+
 const API_BASE_URL = "/api";
+const NEWS_TTL_MS = 5 * 60 * 1000;
+
+function devLog(...args) {
+  if (import.meta.env.DEV) {
+    console.log(...args);
+  }
+}
 
 export async function fetchCompanyNews(query, pageSize = 5) {
-  const response = await fetch(
-    `${API_BASE_URL}/news/${encodeURIComponent(query)}?page_size=${pageSize}`
-  );
+  const normalizedQuery = query?.trim();
 
-  console.log("News API response:", response);
-
-  if (!response.ok) {
-    throw new Error(`Failed to fetch news: ${response.status}`);
+  if (!normalizedQuery) {
+    return [];
   }
 
-  return response.json();
+  return getOrFetch(`news:${normalizedQuery}:${pageSize}`, async () => {
+    const response = await fetch(
+      `${API_BASE_URL}/news/${encodeURIComponent(normalizedQuery)}?page_size=${pageSize}`
+    );
+
+    devLog("News API response:", response);
+
+    if (!response.ok) {
+      throw new Error(`Failed to fetch news: ${response.status}`);
+    }
+
+    return response.json();
+  }, NEWS_TTL_MS);
 }

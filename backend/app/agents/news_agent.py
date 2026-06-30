@@ -1,10 +1,12 @@
 import os
+from pathlib import Path
 
 import requests
 from dotenv import load_dotenv
 
 
-load_dotenv()
+BACKEND_ENV_PATH = Path(__file__).resolve().parents[2] / ".env"
+load_dotenv(BACKEND_ENV_PATH)
 
 
 class NewsAgent:
@@ -24,6 +26,7 @@ class NewsAgent:
                 "q": query,
                 "pageSize": page_size,
                 "sortBy": "publishedAt",
+                "language": "en",
                 "apiKey": api_key,
             },
             timeout=10,

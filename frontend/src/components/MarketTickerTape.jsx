@@ -1,4 +1,9 @@
 import { useEffect, useState } from "react";
+import { fetchStockMetrics } from "../api/stockApi";
+import {
+  formatCurrencyByTicker,
+  getMarketInfo,
+} from "../utils/marketUtils";
 
 const TICKERS = [
   "AAPL",
@@ -13,36 +18,10 @@ const TICKERS = [
   "HDFCBANK.NS",
 ];
 
-const API_BASE_URL = "/api";
-
-function calculateTrend(historyData) {
-  if (!Array.isArray(historyData) || historyData.length < 2) {
-    return {
-      change: null,
-      changePercent: null,
-      direction: "flat",
-    };
+function devWarn(...args) {
+  if (import.meta.env.DEV) {
+    console.warn(...args);
   }
-
-  const startPrice = Number(historyData[0]?.close);
-  const latestPrice = Number(historyData[historyData.length - 1]?.close);
-
-  if (!startPrice || !latestPrice) {
-    return {
-      change: null,
-      changePercent: null,
-      direction: "flat",
-    };
-  }
-
-  const change = latestPrice - startPrice;
-  const changePercent = (change / startPrice) * 100;
-
-  return {
-    change: Number(change.toFixed(2)),
-    changePercent: Number(changePercent.toFixed(2)),
-    direction: change > 0 ? "up" : change < 0 ? "down" : "flat",
-  };
 }
 
 function TrendMarker({ direction }) {
@@ -85,6 +64,44 @@ function TrendMarker({ direction }) {
   );
 }
 
+function getStockTrend(stock) {
+  const change = Number(stock?.price_change);
+  const changePercent = Number(stock?.price_change_percent);
+
+  if (!Number.isFinite(change) || !Number.isFinite(changePercent)) {
+    return null;
+  }
+
+  return {
+    change,
+    changePercent,
+    direction: change > 0 ? "up" : change < 0 ? "down" : "flat",
+  };
+}
+
+async function fetchTickerBatch(tickers) {
+  const results = [];
+
+  for (let index = 0; index < tickers.length; index += 2) {
+    const batch = tickers.slice(index, index + 2);
+    const batchResults = await Promise.allSettled(
+      batch.map(async (ticker) => {
+        const stock = await fetchStockMetrics(ticker);
+        const safeStock = stock && typeof stock === "object" ? stock : {};
+
+        return {
+          ...safeStock,
+          ticker: safeStock.ticker || ticker,
+        };
+      })
+    );
+
+    results.push(...batchResults);
+  }
+
+  return results;
+}
+
 function MarketTickerTape({ onTickerSelect }) {
   const [stocks, setStocks] = useState([]);
   const [failed, setFailed] = useState(false);
@@ -92,35 +109,22 @@ function MarketTickerTape({ onTickerSelect }) {
   useEffect(() => {
     async function fetchTickerData() {
       try {
-        const results = await Promise.allSettled(
-          TICKERS.map(async (ticker) => {
-            const [stockResponse, historyResponse] = await Promise.all([
-              fetch(`${API_BASE_URL}/stocks/${ticker}`),
-              fetch(`${API_BASE_URL}/stocks/${ticker}/history?period=5d`),
-            ]);
-
-            if (!stockResponse.ok) {
-              throw new Error(`Failed to fetch ${ticker}`);
-            }
-
-            const stock = await stockResponse.json();
-            const history = historyResponse.ok ? await historyResponse.json() : [];
-
-            return {
-              ...stock,
-              trend: calculateTrend(history),
-            };
-          })
-        );
+        const results = await fetchTickerBatch(TICKERS);
 
         const loadedStocks = results
           .filter((result) => result.status === "fulfilled")
           .map((result) => result.value);
 
+        results
+          .filter((result) => result.status === "rejected")
+          .forEach((result) => {
+            devWarn("failed API name:", "ticker tape stock", result.reason);
+          });
+
         setStocks(loadedStocks);
         setFailed(loadedStocks.length === 0);
       } catch (error) {
-        console.warn("Market ticker tape fetch error:", error);
+        devWarn("Market ticker tape fetch error:", error);
         setFailed(true);
       }
     }
@@ -151,9 +155,11 @@ function MarketTickerTape({ onTickerSelect }) {
       >
         <div className="market-ticker-track">
           {scrollingItems.map((stock, index) => {
-            const direction = stock.trend?.direction ?? "flat";
+            const trend = stock.trend ?? getStockTrend(stock);
+            const direction = trend?.direction ?? "flat";
             const isPositive = direction === "up";
             const isNegative = direction === "down";
+            const marketInfo = getMarketInfo(stock.ticker);
 
             return (
               <button
@@ -176,12 +182,24 @@ function MarketTickerTape({ onTickerSelect }) {
                   fontSize: "0.88rem",
                 }}
               >
+                <span>{marketInfo.flag}</span>
                 <strong style={{ color: "#e2e8f0" }}>{stock.ticker}</strong>
                 <span style={{ color: "#e5e7eb" }}>
-                  {stock.current_price ?? "Loading"}
+                  {formatCurrencyByTicker(stock.current_price, stock.ticker)}
                 </span>
-                {stock.trend?.change !== null &&
-                  stock.trend?.change !== undefined && (
+                <span
+                  style={{
+                    padding: "0.12rem 0.45rem",
+                    border: "1px solid #475569",
+                    color: "#cbd5e1",
+                    fontSize: "0.72rem",
+                    fontWeight: 700,
+                  }}
+                >
+                  {marketInfo.market || "Global"}
+                </span>
+                {trend?.change !== null &&
+                  trend?.change !== undefined && (
                     <span
                       style={{
                         display: "inline-flex",
@@ -197,10 +215,16 @@ function MarketTickerTape({ onTickerSelect }) {
                     >
                       <TrendMarker direction={direction} />
                       {isPositive ? "+" : ""}
-                      {stock.trend.change} ({isPositive ? "+" : ""}
-                      {stock.trend.changePercent}%)
+                      {trend.change} ({isPositive ? "+" : ""}
+                      {trend.changePercent}%)
                     </span>
                   )}
+                {(trend?.change === null ||
+                  trend?.change === undefined) && (
+                  <span style={{ color: "#94a3b8", fontWeight: 700 }}>
+                    {"\u2014"}
+                  </span>
+                )}
               </button>
             );
           })}

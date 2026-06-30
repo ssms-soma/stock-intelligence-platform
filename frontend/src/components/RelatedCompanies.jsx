@@ -1,5 +1,15 @@
 import { useEffect, useMemo, useState } from "react";
-import { fetchStockHistory, fetchStockMetrics } from "../api/stockApi";
+import { fetchStockMetrics } from "../api/stockApi";
+import {
+  formatCurrencyByTicker,
+  getMarketInfo,
+} from "../utils/marketUtils";
+
+function devWarn(...args) {
+  if (import.meta.env.DEV) {
+    console.warn(...args);
+  }
+}
 
 const RELATED_TICKERS = {
   "INFY.NS": ["TCS.NS", "WIPRO.NS", "HCLTECH.NS", "TECHM.NS"],
@@ -24,49 +34,6 @@ function getFallbackRelatedTickers(ticker) {
   return ["AAPL", "MSFT", "GOOGL", "AMZN", "TSLA", "NVDA"].filter(
     (relatedTicker) => relatedTicker !== ticker
   );
-}
-
-function calculateTrend(historyData) {
-  if (!Array.isArray(historyData) || historyData.length < 2) {
-    return {
-      change: null,
-      changePercent: null,
-      direction: "flat",
-    };
-  }
-
-  const startPrice = Number(historyData[0]?.close);
-  const latestPrice = Number(historyData[historyData.length - 1]?.close);
-
-  if (!Number.isFinite(startPrice) || !Number.isFinite(latestPrice) || startPrice === 0) {
-    return {
-      change: null,
-      changePercent: null,
-      direction: "flat",
-    };
-  }
-
-  const change = latestPrice - startPrice;
-  const changePercent = (change / startPrice) * 100;
-
-  return {
-    change,
-    changePercent,
-    direction: change > 0 ? "up" : change < 0 ? "down" : "flat",
-  };
-}
-
-function formatPrice(value) {
-  const numberValue = Number(value);
-
-  if (!Number.isFinite(numberValue)) {
-    return "Loading...";
-  }
-
-  return numberValue.toLocaleString(undefined, {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  });
 }
 
 function formatTrendValue(value) {
@@ -105,6 +72,21 @@ function TrendMarker({ direction }) {
   return <span className="related-trend-flat" />;
 }
 
+function getStockTrend(stock) {
+  const change = Number(stock?.price_change);
+  const changePercent = Number(stock?.price_change_percent);
+
+  if (!Number.isFinite(change) || !Number.isFinite(changePercent)) {
+    return null;
+  }
+
+  return {
+    change,
+    changePercent,
+    direction: change > 0 ? "up" : change < 0 ? "down" : "flat",
+  };
+}
+
 function RelatedCompanies({ ticker, onTickerSelect }) {
   const [relatedStocks, setRelatedStocks] = useState([]);
 
@@ -119,33 +101,45 @@ function RelatedCompanies({ ticker, onTickerSelect }) {
   }, [ticker]);
 
   useEffect(() => {
+    let isCurrent = true;
+
     async function fetchRelatedCompanies() {
       setRelatedStocks([]);
 
       const results = await Promise.allSettled(
         relatedTickers.map(async (relatedTicker) => {
-          const [stock, history] = await Promise.all([
-            fetchStockMetrics(relatedTicker),
-            fetchStockHistory(relatedTicker, "5d").catch(() => []),
-          ]);
+          const stock = await fetchStockMetrics(relatedTicker);
+          const safeStock = stock && typeof stock === "object" ? stock : {};
 
           return {
-            ...stock,
-            trend: calculateTrend(history),
+            ...safeStock,
+            ticker: safeStock.ticker || relatedTicker,
           };
         })
       );
 
-      setRelatedStocks(
-        results
-          .filter((result) => result.status === "fulfilled")
-          .map((result) => result.value)
-      );
+      results
+        .filter((result) => result.status === "rejected")
+        .forEach((result) => {
+          devWarn("failed API name:", "related company stock", result.reason);
+        });
+
+      if (isCurrent) {
+        setRelatedStocks(
+          results
+            .filter((result) => result.status === "fulfilled")
+            .map((result) => result.value)
+        );
+      }
     }
 
     if (relatedTickers.length > 0) {
       fetchRelatedCompanies();
     }
+
+    return () => {
+      isCurrent = false;
+    };
   }, [relatedTickers]);
 
   if (relatedTickers.length === 0) {
@@ -179,10 +173,12 @@ function RelatedCompanies({ ticker, onTickerSelect }) {
         }}
       >
         {displayedStocks.map((stock) => {
-          const direction = stock.trend?.direction ?? "flat";
+          const trend = stock.trend ?? getStockTrend(stock);
+          const direction = trend?.direction ?? "flat";
           const isUp = direction === "up";
           const isDown = direction === "down";
           const trendColor = isUp ? "#15803d" : isDown ? "#b91c1c" : "#64748b";
+          const marketInfo = getMarketInfo(stock.ticker);
 
           return (
             <button
@@ -191,17 +187,34 @@ function RelatedCompanies({ ticker, onTickerSelect }) {
               onClick={() => onTickerSelect?.(stock.ticker)}
               className="related-company-card"
             >
-              <span className="related-company-symbol">{stock.ticker}</span>
-              <span className="related-company-price">
-                {formatPrice(stock.current_price)}
+              <span className="related-company-symbol">
+                {marketInfo.flag} {stock.ticker}
               </span>
               <span
-                className="related-company-trend"
-                style={{ color: trendColor }}
+                style={{
+                  color: "#64748b",
+                  fontSize: "0.75rem",
+                  fontWeight: 700,
+                }}
               >
-                <TrendMarker direction={direction} />
-                {formatTrendText(stock.trend)}
+                {marketInfo.market || "Global"}
               </span>
+              <span className="related-company-price">
+                {formatCurrencyByTicker(stock.current_price, stock.ticker)}
+              </span>
+              {trend ? (
+                <span
+                  className="related-company-trend"
+                  style={{ color: trendColor }}
+                >
+                  <TrendMarker direction={direction} />
+                  {formatTrendText(trend)}
+                </span>
+              ) : (
+                <span className="related-company-trend" style={{ color: "#64748b" }}>
+                  {"\u2014"}
+                </span>
+              )}
             </button>
           );
         })}
