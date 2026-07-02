@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { fetchRecommendations } from "../api/recommendationApi";
 import { fetchStockMetrics } from "../api/stockApi";
 import {
   formatCurrencyByTicker,
@@ -34,6 +35,10 @@ function getFallbackRelatedTickers(ticker) {
   return ["AAPL", "MSFT", "GOOGL", "AMZN", "TSLA", "NVDA"].filter(
     (relatedTicker) => relatedTicker !== ticker
   );
+}
+
+function getLocalRelatedTickers(ticker) {
+  return RELATED_TICKERS[ticker] ?? getFallbackRelatedTickers(ticker);
 }
 
 function formatTrendValue(value) {
@@ -88,16 +93,49 @@ function getStockTrend(stock) {
 }
 
 function RelatedCompanies({ ticker, onTickerSelect }) {
+  const [backendRecommendationResult, setBackendRecommendationResult] =
+    useState(null);
   const [relatedStocks, setRelatedStocks] = useState([]);
 
   const relatedTickers = useMemo(() => {
-    const normalizedTicker = ticker?.toUpperCase();
+    const normalizedTicker = ticker?.trim().toUpperCase();
 
     if (!normalizedTicker) {
       return [];
     }
 
-    return RELATED_TICKERS[normalizedTicker] ?? getFallbackRelatedTickers(normalizedTicker);
+    return backendRecommendationResult?.ticker === normalizedTicker &&
+      backendRecommendationResult.recommendations.length > 0
+      ? backendRecommendationResult.recommendations
+      : getLocalRelatedTickers(normalizedTicker);
+  }, [backendRecommendationResult, ticker]);
+
+  useEffect(() => {
+    let isCurrent = true;
+    const normalizedTicker = ticker?.trim().toUpperCase();
+
+    async function fetchBackendRecommendations() {
+      try {
+        const recommendations = await fetchRecommendations(normalizedTicker);
+
+        if (isCurrent && recommendations.length > 0) {
+          setBackendRecommendationResult({
+            ticker: normalizedTicker,
+            recommendations,
+          });
+        }
+      } catch (error) {
+        devWarn("failed API name:", "recommendations", error);
+      }
+    }
+
+    if (normalizedTicker) {
+      fetchBackendRecommendations();
+    }
+
+    return () => {
+      isCurrent = false;
+    };
   }, [ticker]);
 
   useEffect(() => {

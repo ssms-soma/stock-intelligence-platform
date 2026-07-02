@@ -58,6 +58,12 @@ function Dashboard() {
   }, [newsData]);
 
   useEffect(() => {
+    if (routeTicker) {
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    }
+  }, [routeTicker]);
+
+  useEffect(() => {
     let isCurrent = true;
 
     async function loadResearchSummary() {

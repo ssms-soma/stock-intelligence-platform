@@ -1,3 +1,5 @@
+import { formatCurrencyByTicker, getMarketInfo } from "../utils/marketUtils";
+
 const EMPTY_MESSAGE = "No major signals detected.";
 
 function renderValue(value, fallback) {
@@ -46,7 +48,7 @@ function formatPercent(value) {
   return `${numberValue >= 0 ? "+" : ""}${formatNumber(numberValue, 2)}%`;
 }
 
-function formatCurrency(value) {
+function formatCurrency(value, ticker) {
   if (value === null || value === undefined || value === "") {
     return "N/A";
   }
@@ -57,10 +59,10 @@ function formatCurrency(value) {
     return renderValue(value, "N/A");
   }
 
-  return `$${formatNumber(numberValue, 2)}`;
+  return formatCurrencyByTicker(numberValue, ticker);
 }
 
-function formatMarketCap(value) {
+function formatMarketCap(value, ticker) {
   if (value === null || value === undefined || value === "") {
     return "N/A";
   }
@@ -71,19 +73,30 @@ function formatMarketCap(value) {
     return renderValue(value, "N/A");
   }
 
+  const marketInfo = getMarketInfo(ticker);
+
   if (Math.abs(numberValue) >= 1_000_000_000_000) {
-    return `$${formatNumber(numberValue / 1_000_000_000_000, 2)}T`;
+    return `${marketInfo.currencySymbol}${formatNumber(
+      numberValue / 1_000_000_000_000,
+      2
+    )}T`;
   }
 
   if (Math.abs(numberValue) >= 1_000_000_000) {
-    return `$${formatNumber(numberValue / 1_000_000_000, 2)}B`;
+    return `${marketInfo.currencySymbol}${formatNumber(
+      numberValue / 1_000_000_000,
+      2
+    )}B`;
   }
 
   if (Math.abs(numberValue) >= 1_000_000) {
-    return `$${formatNumber(numberValue / 1_000_000, 2)}M`;
+    return `${marketInfo.currencySymbol}${formatNumber(
+      numberValue / 1_000_000,
+      2
+    )}M`;
   }
 
-  return formatCurrency(numberValue);
+  return formatCurrency(numberValue, ticker);
 }
 
 function getToneClass(value) {
@@ -163,15 +176,15 @@ function pickFirstValue(source, keys, fallback = "N/A") {
   return fallback;
 }
 
-function formatMetricValue(key, value) {
+function formatMetricValue(key, value, ticker) {
   const normalizedKey = key.toLowerCase();
 
   if (normalizedKey.includes("market_cap")) {
-    return formatMarketCap(value);
+    return formatMarketCap(value, ticker);
   }
 
   if (normalizedKey.includes("price")) {
-    return formatCurrency(value);
+    return formatCurrency(value, ticker);
   }
 
   if (normalizedKey.includes("percent") || normalizedKey.includes("margin")) {
@@ -287,21 +300,21 @@ function MetricSection({ title, children }) {
   );
 }
 
-function PriceAnalysisSection({ priceAnalysis }) {
+function PriceAnalysisSection({ priceAnalysis, ticker }) {
   const fields = [
     {
       label: "Start Price",
-      value: formatCurrency(priceAnalysis.start_price),
+      value: formatCurrency(priceAnalysis.start_price, ticker),
       toneClass: "tone-neutral",
     },
     {
       label: "Latest Price",
-      value: formatCurrency(priceAnalysis.latest_price),
+      value: formatCurrency(priceAnalysis.latest_price, ticker),
       toneClass: "tone-neutral",
     },
     {
       label: "Price Change",
-      value: formatCurrency(priceAnalysis.price_change),
+      value: formatCurrency(priceAnalysis.price_change, ticker),
       toneClass: getToneClass(priceAnalysis.price_change),
     },
     {
@@ -341,7 +354,7 @@ function PriceAnalysisSection({ priceAnalysis }) {
   );
 }
 
-function ObjectMetricSection({ title, value, fallback }) {
+function ObjectMetricSection({ title, value, fallback, ticker }) {
   const scalarValue = renderValue(value, null);
   const entries = isPlainObject(value) ? Object.entries(value) : [];
 
@@ -366,7 +379,7 @@ function ObjectMetricSection({ title, value, fallback }) {
   return (
     <MetricSection title={title}>
       {entries.map(([key, itemValue]) => {
-        const displayValue = formatMetricValue(key, itemValue);
+        const displayValue = formatMetricValue(key, itemValue, ticker);
 
         return (
           <MetricCard
@@ -520,16 +533,18 @@ function ResearchSummary({ ticker, researchData, loading, error }) {
       />
 
       <div className="research-summary-grid">
-        <PriceAnalysisSection priceAnalysis={priceAnalysis} />
+        <PriceAnalysisSection priceAnalysis={priceAnalysis} ticker={displayTicker} />
         <ObjectMetricSection
           title="News Sentiment Analysis"
           value={newsSentiment}
           fallback="News sentiment analysis is not available yet."
+          ticker={displayTicker}
         />
         <ObjectMetricSection
           title="Valuation Snapshot"
           value={valuation}
           fallback="Valuation data is not available yet."
+          ticker={displayTicker}
         />
       </div>
 
