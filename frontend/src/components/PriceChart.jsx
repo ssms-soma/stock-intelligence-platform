@@ -108,7 +108,95 @@ function formatCloseValue(value) {
   });
 }
 
-function PriceChart({ historyData, activePeriod, onPeriodChange, error, ticker }) {
+function hasPriceTarget(priceTarget) {
+  return Boolean(
+    priceTarget &&
+      (priceTarget.mean ||
+        priceTarget.high ||
+        priceTarget.low ||
+        priceTarget.median ||
+        priceTarget.recommendation)
+  );
+}
+
+function PriceTargetItem({ label, value }) {
+  if (value === null || value === undefined || value === "") {
+    return null;
+  }
+
+  return (
+    <div className="price-target-item">
+      <span>{label}</span>
+      <strong>{value}</strong>
+    </div>
+  );
+}
+
+function PriceTargetStrip({ priceTarget, ticker, marketMetadata }) {
+  if (!hasPriceTarget(priceTarget)) {
+    return null;
+  }
+
+  const recommendation = priceTarget.recommendation
+    ? String(priceTarget.recommendation).replace(/_/g, " ")
+    : null;
+  const analystCount = Number(priceTarget.analyst_count);
+  const targetMetadata = priceTarget || marketMetadata;
+
+  return (
+    <div className="price-target-strip">
+      <div>
+        <span className="price-target-label">1Y Price Target</span>
+        <strong>
+          {priceTarget.mean
+            ? formatCurrencyByTicker(priceTarget.mean, ticker, targetMetadata)
+            : "N/A"}
+        </strong>
+      </div>
+      <div className="price-target-grid">
+        <PriceTargetItem
+          label="Low"
+          value={
+            priceTarget.low
+              ? formatCurrencyByTicker(priceTarget.low, ticker, targetMetadata)
+              : null
+          }
+        />
+        <PriceTargetItem
+          label="Median"
+          value={
+            priceTarget.median
+              ? formatCurrencyByTicker(priceTarget.median, ticker, targetMetadata)
+              : null
+          }
+        />
+        <PriceTargetItem
+          label="High"
+          value={
+            priceTarget.high
+              ? formatCurrencyByTicker(priceTarget.high, ticker, targetMetadata)
+              : null
+          }
+        />
+        <PriceTargetItem label="Rating" value={recommendation} />
+        <PriceTargetItem
+          label="Analysts"
+          value={Number.isFinite(analystCount) ? analystCount : null}
+        />
+      </div>
+    </div>
+  );
+}
+
+function PriceChart({
+  historyData,
+  activePeriod,
+  onPeriodChange,
+  error,
+  ticker,
+  priceTarget,
+  marketMetadata,
+}) {
   const axisSettings = getAxisSettings(activePeriod);
   const hasHistory = Array.isArray(historyData) && historyData.length > 0;
 
@@ -157,6 +245,12 @@ function PriceChart({ historyData, activePeriod, onPeriodChange, error, ticker }
         </div>
       </div>
 
+      <PriceTargetStrip
+        priceTarget={priceTarget}
+        ticker={ticker}
+        marketMetadata={marketMetadata}
+      />
+
       <div style={{ height: "350px" }}>
         {hasHistory ? (
           <ResponsiveContainer width="100%" height="100%">
@@ -176,7 +270,7 @@ function PriceChart({ historyData, activePeriod, onPeriodChange, error, ticker }
                 labelFormatter={formatTooltipDate}
                 formatter={(value) => [
                   ticker
-                    ? formatCurrencyByTicker(value, ticker)
+                    ? formatCurrencyByTicker(value, ticker, marketMetadata)
                     : formatCloseValue(value),
                   "Close",
                 ]}

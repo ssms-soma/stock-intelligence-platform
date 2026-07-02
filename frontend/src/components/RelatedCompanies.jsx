@@ -216,7 +216,7 @@ function RelatedCompanies({ ticker, onTickerSelect }) {
           const isUp = direction === "up";
           const isDown = direction === "down";
           const trendColor = isUp ? "#15803d" : isDown ? "#b91c1c" : "#64748b";
-          const marketInfo = getMarketInfo(stock.ticker);
+          const marketInfo = getMarketInfo(stock.ticker, stock);
 
           return (
             <button
@@ -235,10 +235,14 @@ function RelatedCompanies({ ticker, onTickerSelect }) {
                   fontWeight: 700,
                 }}
               >
-                {marketInfo.market || "Global"}
+                {marketInfo.exchange || marketInfo.market || "Global"}
               </span>
               <span className="related-company-price">
-                {formatCurrencyByTicker(stock.current_price, stock.ticker)}
+                {formatCurrencyByTicker(
+                  stock.current_price,
+                  stock.ticker,
+                  stock
+                )}
               </span>
               {trend ? (
                 <span

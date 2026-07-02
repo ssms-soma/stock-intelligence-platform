@@ -4,6 +4,8 @@ from concurrent.futures import ThreadPoolExecutor, TimeoutError
 
 import yfinance as yf
 
+from app.utils.market_utils import get_market_metadata
+
 
 logger = logging.getLogger(__name__)
 
@@ -62,6 +64,7 @@ class StockDataAgent:
             warnings.append("Extended company details are temporarily unavailable.")
             info = {}
 
+        market_metadata = get_market_metadata(ticker, info)
         stock_data = {
             "ticker": ticker,
             "company_name": info.get("longName") or info.get("shortName") or "N/A",
@@ -104,6 +107,11 @@ class StockDataAgent:
             )
             or info.get("volume"),
             "sector": info.get("sector") or "N/A",
+            "market": market_metadata["market"],
+            "country": market_metadata["country"],
+            "exchange": market_metadata["exchange"],
+            "currency": market_metadata["currency"],
+            "currency_symbol": market_metadata["currency_symbol"],
         }
 
         if warnings:

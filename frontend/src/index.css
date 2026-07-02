@@ -242,6 +242,149 @@ p {
   overflow-wrap: anywhere;
 }
 
+.company-profile-card {
+  margin-top: 2rem;
+  border: 1px solid #dbe3ef;
+  border-radius: 8px;
+  padding: 1.35rem;
+  background: #ffffff;
+  color: #475569;
+  text-align: left;
+  box-shadow: 0 12px 30px rgba(15, 23, 42, 0.06);
+}
+
+.company-profile-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.company-profile-header h2 {
+  margin: 0;
+  color: #0f172a;
+  font-size: 1.4rem;
+  font-weight: 850;
+  letter-spacing: 0;
+}
+
+.company-profile-eyebrow {
+  margin-bottom: 0.35rem;
+  color: #64748b;
+  font-size: 0.78rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.company-profile-muted {
+  margin-top: 0.3rem;
+  color: #64748b;
+  line-height: 1.55;
+}
+
+.company-profile-logo {
+  width: 56px;
+  height: 56px;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  object-fit: contain;
+  background: #ffffff;
+}
+
+.company-profile-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 0.8rem;
+  margin-top: 1.25rem;
+}
+
+.company-profile-item {
+  min-height: 76px;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  padding: 0.85rem;
+  background: #f8fafc;
+  box-sizing: border-box;
+}
+
+.company-profile-item span {
+  display: block;
+  color: #64748b;
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.company-profile-item strong {
+  display: block;
+  margin-top: 0.35rem;
+  color: #0f172a;
+  font-size: 0.98rem;
+  font-weight: 800;
+  line-height: 1.25;
+  overflow-wrap: anywhere;
+}
+
+.company-profile-link {
+  display: inline-block;
+  margin-top: 1rem;
+  color: #2563eb;
+  font-weight: 750;
+  overflow-wrap: anywhere;
+}
+
+.company-profile-summary {
+  margin-top: 1rem;
+  color: #475569;
+  line-height: 1.65;
+}
+
+.price-target-strip {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 1rem;
+  border: 1px solid #dbeafe;
+  border-left: 4px solid #2563eb;
+  border-radius: 8px;
+  padding: 0.85rem 1rem;
+  background: #eff6ff;
+  text-align: left;
+}
+
+.price-target-label,
+.price-target-item span {
+  display: block;
+  color: #64748b;
+  font-size: 0.7rem;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.price-target-strip strong {
+  display: block;
+  margin-top: 0.25rem;
+  color: #0f172a;
+  font-size: 1.25rem;
+  font-weight: 850;
+  line-height: 1.2;
+  text-transform: capitalize;
+}
+
+.price-target-grid {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(72px, auto));
+  gap: 0.75rem;
+}
+
+.price-target-item strong {
+  font-size: 0.92rem;
+}
+
 .sentiment-badge {
   display: inline-flex;
   align-items: center;
@@ -790,9 +933,15 @@ p {
 
 @media (max-width: 720px) {
   .stock-overview-header,
+  .company-profile-header,
+  .price-target-strip,
   .skeleton-row {
     flex-direction: column;
     align-items: stretch;
+  }
+
+  .price-target-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
   .stock-price-block {

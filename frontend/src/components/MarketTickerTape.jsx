@@ -159,7 +159,7 @@ function MarketTickerTape({ onTickerSelect }) {
             const direction = trend?.direction ?? "flat";
             const isPositive = direction === "up";
             const isNegative = direction === "down";
-            const marketInfo = getMarketInfo(stock.ticker);
+            const marketInfo = getMarketInfo(stock.ticker, stock);
 
             return (
               <button
@@ -185,7 +185,11 @@ function MarketTickerTape({ onTickerSelect }) {
                 <span>{marketInfo.flag}</span>
                 <strong style={{ color: "#e2e8f0" }}>{stock.ticker}</strong>
                 <span style={{ color: "#e5e7eb" }}>
-                  {formatCurrencyByTicker(stock.current_price, stock.ticker)}
+                  {formatCurrencyByTicker(
+                    stock.current_price,
+                    stock.ticker,
+                    stock
+                  )}
                 </span>
                 <span
                   style={{
@@ -196,7 +200,7 @@ function MarketTickerTape({ onTickerSelect }) {
                     fontWeight: 700,
                   }}
                 >
-                  {marketInfo.market || "Global"}
+                  {marketInfo.exchange || marketInfo.market || "Global"}
                 </span>
                 {trend?.change !== null &&
                   trend?.change !== undefined && (

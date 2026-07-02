@@ -1,6 +1,7 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
+from app.api.routes.company_routes import router as company_router
 from app.api.routes.health_routes import router as health_router
 from app.api.routes.news_routes import router as news_router
 from app.api.routes.recommendation_routes import router as recommendation_router
@@ -24,6 +25,7 @@ app.add_middleware(
 
 app.include_router(health_router, prefix="/api")
 app.include_router(stock_router, prefix="/api")
+app.include_router(company_router, prefix="/api")
 app.include_router(news_router, prefix="/api")
 app.include_router(recommendation_router, prefix="/api")
 app.include_router(research_router, prefix="/api")

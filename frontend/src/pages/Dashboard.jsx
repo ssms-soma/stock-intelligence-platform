@@ -1,8 +1,10 @@
 import { useEffect, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
+import { fetchCompanyProfile } from "../api/companyApi";
 import { fetchCompanyNews } from "../api/newsApi";
 import { fetchResearchSummary } from "../api/researchApi";
 import { fetchStockHistory, fetchStockMetrics } from "../api/stockApi";
+import CompanyProfileCard from "../components/CompanyProfileCard";
 import HeroSection from "../components/HeroSection";
 import MarketHeadlines from "../components/MarketHeadlines";
 import MarketTickerTape from "../components/MarketTickerTape";
@@ -37,6 +39,9 @@ function Dashboard() {
   const [selectedTicker, setSelectedTicker] = useState("");
   const [stockData, setStockData] = useState(null);
   const [historyData, setHistoryData] = useState([]);
+  const [companyData, setCompanyData] = useState(null);
+  const [companyLoading, setCompanyLoading] = useState(false);
+  const [companyError, setCompanyError] = useState("");
   const [newsData, setNewsData] = useState([]);
   const [researchData, setResearchData] = useState(null);
   const [researchLoading, setResearchLoading] = useState(false);
@@ -109,6 +114,9 @@ function Dashboard() {
       setSelectedTicker("");
       setStockData(null);
       setHistoryData([]);
+      setCompanyData(null);
+      setCompanyError("");
+      setCompanyLoading(false);
       setNewsData([]);
       setResearchData(null);
       setResearchError("");
@@ -165,11 +173,38 @@ function Dashboard() {
     setSelectedTicker(trimmedTicker);
     setStockData(null);
     setHistoryData([]);
+    setCompanyData(null);
+    setCompanyError("");
+    setCompanyLoading(true);
     setNewsData([]);
     setResearchData(null);
     setResearchError("");
     setResearchRequestId((currentId) => currentId + 1);
     setChartPeriod(period);
+
+    fetchCompanyProfile(trimmedTicker)
+      .then((companyResult) => {
+        if (requestSequenceRef.current !== requestId) {
+          return;
+        }
+
+        setCompanyData(companyResult?.company_profile || null);
+        setCompanyError(companyResult?.warning || "");
+      })
+      .catch((companyProfileError) => {
+        if (requestSequenceRef.current !== requestId) {
+          return;
+        }
+
+        devWarn("failed API name:", "company profile", companyProfileError);
+        setCompanyData(null);
+        setCompanyError("Company profile is temporarily unavailable.");
+      })
+      .finally(() => {
+        if (requestSequenceRef.current === requestId) {
+          setCompanyLoading(false);
+        }
+      });
 
     const [stockResult, historyResult] = await Promise.allSettled([
       fetchStockMetrics(trimmedTicker),
@@ -368,6 +403,12 @@ function Dashboard() {
 
           {stockData && <StockOverviewCard stockData={stockData} />}
 
+          <CompanyProfileCard
+            profile={companyData}
+            loading={companyLoading}
+            error={companyError}
+          />
+
           {historyLoading && historyData.length === 0 && <SkeletonChart />}
 
           {!historyLoading && (
@@ -377,6 +418,8 @@ function Dashboard() {
               onPeriodChange={handlePeriodChange}
               error={historyError}
               ticker={selectedTicker}
+              priceTarget={companyData?.price_target}
+              marketMetadata={stockData || companyData}
             />
           )}
 

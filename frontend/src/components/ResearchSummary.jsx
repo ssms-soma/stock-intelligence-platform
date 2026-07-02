@@ -48,7 +48,7 @@ function formatPercent(value) {
   return `${numberValue >= 0 ? "+" : ""}${formatNumber(numberValue, 2)}%`;
 }
 
-function formatCurrency(value, ticker) {
+function formatCurrency(value, ticker, marketMetadata) {
   if (value === null || value === undefined || value === "") {
     return "N/A";
   }
@@ -59,10 +59,10 @@ function formatCurrency(value, ticker) {
     return renderValue(value, "N/A");
   }
 
-  return formatCurrencyByTicker(numberValue, ticker);
+  return formatCurrencyByTicker(numberValue, ticker, marketMetadata);
 }
 
-function formatMarketCap(value, ticker) {
+function formatMarketCap(value, ticker, marketMetadata) {
   if (value === null || value === undefined || value === "") {
     return "N/A";
   }
@@ -73,7 +73,7 @@ function formatMarketCap(value, ticker) {
     return renderValue(value, "N/A");
   }
 
-  const marketInfo = getMarketInfo(ticker);
+  const marketInfo = getMarketInfo(ticker, marketMetadata);
 
   if (Math.abs(numberValue) >= 1_000_000_000_000) {
     return `${marketInfo.currencySymbol}${formatNumber(
@@ -96,7 +96,7 @@ function formatMarketCap(value, ticker) {
     )}M`;
   }
 
-  return formatCurrency(numberValue, ticker);
+  return formatCurrency(numberValue, ticker, marketMetadata);
 }
 
 function getToneClass(value) {
@@ -176,15 +176,15 @@ function pickFirstValue(source, keys, fallback = "N/A") {
   return fallback;
 }
 
-function formatMetricValue(key, value, ticker) {
+function formatMetricValue(key, value, ticker, marketMetadata) {
   const normalizedKey = key.toLowerCase();
 
   if (normalizedKey.includes("market_cap")) {
-    return formatMarketCap(value, ticker);
+    return formatMarketCap(value, ticker, marketMetadata);
   }
 
   if (normalizedKey.includes("price")) {
-    return formatCurrency(value, ticker);
+    return formatCurrency(value, ticker, marketMetadata);
   }
 
   if (normalizedKey.includes("percent") || normalizedKey.includes("margin")) {
@@ -300,21 +300,21 @@ function MetricSection({ title, children }) {
   );
 }
 
-function PriceAnalysisSection({ priceAnalysis, ticker }) {
+function PriceAnalysisSection({ priceAnalysis, ticker, marketMetadata }) {
   const fields = [
     {
       label: "Start Price",
-      value: formatCurrency(priceAnalysis.start_price, ticker),
+      value: formatCurrency(priceAnalysis.start_price, ticker, marketMetadata),
       toneClass: "tone-neutral",
     },
     {
       label: "Latest Price",
-      value: formatCurrency(priceAnalysis.latest_price, ticker),
+      value: formatCurrency(priceAnalysis.latest_price, ticker, marketMetadata),
       toneClass: "tone-neutral",
     },
     {
       label: "Price Change",
-      value: formatCurrency(priceAnalysis.price_change, ticker),
+      value: formatCurrency(priceAnalysis.price_change, ticker, marketMetadata),
       toneClass: getToneClass(priceAnalysis.price_change),
     },
     {
@@ -354,7 +354,7 @@ function PriceAnalysisSection({ priceAnalysis, ticker }) {
   );
 }
 
-function ObjectMetricSection({ title, value, fallback, ticker }) {
+function ObjectMetricSection({ title, value, fallback, ticker, marketMetadata }) {
   const scalarValue = renderValue(value, null);
   const entries = isPlainObject(value) ? Object.entries(value) : [];
 
@@ -379,7 +379,12 @@ function ObjectMetricSection({ title, value, fallback, ticker }) {
   return (
     <MetricSection title={title}>
       {entries.map(([key, itemValue]) => {
-        const displayValue = formatMetricValue(key, itemValue, ticker);
+        const displayValue = formatMetricValue(
+          key,
+          itemValue,
+          ticker,
+          marketMetadata
+        );
 
         return (
           <MetricCard
@@ -427,6 +432,11 @@ function ResearchSummary({ ticker, researchData, loading, error }) {
     : summary.valuation_snapshot;
   const normalizedNewsSentiment = normalizeObject(newsSentiment);
   const normalizedValuation = normalizeObject(valuation);
+  const marketMetadata =
+    researchData?.market_metadata ||
+    summary.market_metadata ||
+    researchData?.stock_data ||
+    {};
 
   if (loading) {
     return (
@@ -533,18 +543,24 @@ function ResearchSummary({ ticker, researchData, loading, error }) {
       />
 
       <div className="research-summary-grid">
-        <PriceAnalysisSection priceAnalysis={priceAnalysis} ticker={displayTicker} />
+        <PriceAnalysisSection
+          priceAnalysis={priceAnalysis}
+          ticker={displayTicker}
+          marketMetadata={marketMetadata}
+        />
         <ObjectMetricSection
           title="News Sentiment Analysis"
           value={newsSentiment}
           fallback="News sentiment analysis is not available yet."
           ticker={displayTicker}
+          marketMetadata={marketMetadata}
         />
         <ObjectMetricSection
           title="Valuation Snapshot"
           value={valuation}
           fallback="Valuation data is not available yet."
           ticker={displayTicker}
+          marketMetadata={marketMetadata}
         />
       </div>
 

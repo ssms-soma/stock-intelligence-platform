@@ -21,9 +21,21 @@ class ResearchService:
             history_data=history_data,
             news_data=news_data,
         )
+        market_metadata = self._get_market_metadata(stock_data)
+        research_summary["market_metadata"] = market_metadata
 
         return {
             "stock_data": stock_data,
             "news_data": news_data,
+            "market_metadata": market_metadata,
             "research_summary": research_summary,
+        }
+
+    def _get_market_metadata(self, stock_data):
+        return {
+            "market": stock_data.get("market"),
+            "country": stock_data.get("country"),
+            "exchange": stock_data.get("exchange"),
+            "currency": stock_data.get("currency"),
+            "currency_symbol": stock_data.get("currency_symbol"),
         }
