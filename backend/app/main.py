@@ -6,6 +6,7 @@ from app.api.routes.health_routes import router as health_router
 from app.api.routes.news_routes import router as news_router
 from app.api.routes.recommendation_routes import router as recommendation_router
 from app.api.routes.research_routes import router as research_router
+from app.api.routes.router_routes import router as router_router
 from app.api.routes.sentiment_routes import router as sentiment_router
 from app.api.routes.stock_routes import router as stock_router
 
@@ -29,4 +30,5 @@ app.include_router(company_router, prefix="/api")
 app.include_router(news_router, prefix="/api")
 app.include_router(recommendation_router, prefix="/api")
 app.include_router(research_router, prefix="/api")
+app.include_router(router_router, prefix="/api")
 app.include_router(sentiment_router, prefix="/api")

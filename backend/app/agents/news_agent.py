@@ -18,30 +18,42 @@ class NewsAgent:
         api_key = os.getenv("NEWS_API_KEY")
 
         if not api_key:
-            raise ValueError("NEWS_API_KEY environment variable is not set")
+            return {
+                "articles": [],
+                "warning": "NEWS_API_KEY is not configured. News data is unavailable.",
+            }
 
-        response = requests.get(
-            "https://newsapi.org/v2/everything",
-            params={
-                "q": query,
-                "pageSize": page_size,
-                "sortBy": "publishedAt",
-                "language": "en",
-                "apiKey": api_key,
-            },
-            timeout=10,
-        )
-        response.raise_for_status()
+        try:
+            response = requests.get(
+                "https://newsapi.org/v2/everything",
+                params={
+                    "q": query,
+                    "pageSize": page_size,
+                    "sortBy": "publishedAt",
+                    "language": "en",
+                    "apiKey": api_key,
+                },
+                timeout=10,
+            )
+            response.raise_for_status()
+        except requests.RequestException as error:
+            return {
+                "articles": [],
+                "warning": f"NewsAPI request failed: {error}",
+            }
 
         articles = response.json().get("articles", [])
 
-        return [
-            {
-                "title": article.get("title"),
-                "source": article.get("source", {}).get("name"),
-                "url": article.get("url"),
-                "published_at": article.get("publishedAt"),
-                "description": article.get("description"),
-            }
-            for article in articles
-        ]
+        return {
+            "articles": [
+                {
+                    "title": article.get("title"),
+                    "source": article.get("source", {}).get("name"),
+                    "url": article.get("url"),
+                    "published_at": article.get("publishedAt"),
+                    "description": article.get("description"),
+                }
+                for article in articles
+            ],
+            "warning": None,
+        }

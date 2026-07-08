@@ -6,9 +6,12 @@ class NewsService:
     def __init__(self):
         self.news_agent = NewsAgent()
         self.sentiment_service = SentimentService()
+        self.last_warning = None
 
     def get_stock_news(self, query: str, page_size: int = 10):
-        articles = self.news_agent.get_stock_news(query, page_size)
+        result = self.news_agent.get_stock_news(query, page_size)
+        articles = result.get("articles", []) if isinstance(result, dict) else result
+        self.last_warning = result.get("warning") if isinstance(result, dict) else None
 
         for article in articles:
             title = article.get("title") or ""

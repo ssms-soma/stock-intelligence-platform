@@ -1,14 +1,45 @@
+EXCHANGE_DISPLAY_NAMES = {
+    "NMS": "NASDAQ",
+    "NCM": "NASDAQ",
+    "NGM": "NASDAQ",
+    "NAS": "NASDAQ",
+    "NYQ": "NYSE",
+    "ASE": "NYSE American",
+    "NSI": "NSE",
+    "NSE": "NSE",
+    "BSE": "BSE",
+}
+
+
 def normalize_ticker(ticker: str):
     return ticker.strip().upper() if ticker else ""
 
 
+def normalize_exchange(exchange, ticker=None):
+    normalized_ticker = normalize_ticker(ticker)
+
+    if normalized_ticker.endswith(".NS"):
+        return "NSE"
+
+    if normalized_ticker.endswith(".BO"):
+        return "BSE"
+
+    cleaned_exchange = _clean_value(exchange)
+
+    if not cleaned_exchange:
+        return "US"
+
+    exchange_code = str(cleaned_exchange).strip().upper()
+    return EXCHANGE_DISPLAY_NAMES.get(exchange_code, cleaned_exchange)
+
+
 def get_currency_symbol(currency: str):
     symbols = {
-        "INR": "₹",
+        "INR": "\u20b9",
         "USD": "$",
-        "EUR": "€",
-        "GBP": "£",
-        "JPY": "¥",
+        "EUR": "\u20ac",
+        "GBP": "\u00a3",
+        "JPY": "\u00a5",
     }
 
     normalized_currency = currency.upper() if currency else "USD"
@@ -40,11 +71,11 @@ def get_market_metadata(ticker: str, yfinance_info=None):
     currency = _clean_value(info.get("currency")) or _clean_value(
         info.get("financialCurrency")
     ) or "USD"
-    exchange = (
+    raw_exchange = (
         _clean_value(info.get("exchange"))
         or _clean_value(info.get("fullExchangeName"))
-        or "NASDAQ/NYSE"
     )
+    exchange = normalize_exchange(raw_exchange, normalized_ticker)
 
     return {
         "market": _clean_value(info.get("market")) or "United States",
