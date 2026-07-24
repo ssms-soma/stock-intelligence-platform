@@ -3,7 +3,9 @@ import { useNavigate, useParams } from "react-router-dom";
 import { fetchCompanyProfile } from "../api/companyApi";
 import { fetchCompanyNews } from "../api/newsApi";
 import { fetchResearchSummary } from "../api/researchApi";
+import { resolveTicker } from "../api/searchApi";
 import { fetchStockHistory, fetchStockMetrics } from "../api/stockApi";
+import AIResearchAssistant from "../components/AIResearchAssistant";
 import CompanyProfileCard from "../components/CompanyProfileCard";
 import HeroSection from "../components/HeroSection";
 import MarketHeadlines from "../components/MarketHeadlines";
@@ -54,6 +56,7 @@ function Dashboard() {
   const [stockError, setStockError] = useState("");
   const [historyError, setHistoryError] = useState("");
   const [error, setError] = useState("");
+  const [searching, setSearching] = useState(false);
   const requestSequenceRef = useRef(0);
   const historySequenceRef = useRef(0);
   const isStockDetailView = Boolean(routeTicker);
@@ -150,6 +153,34 @@ function Dashboard() {
     }
 
     navigate(`/stock/${encodeURIComponent(trimmedTicker)}`);
+  };
+
+  const handleSearch = async () => {
+    const searchQuery = ticker.trim();
+
+    if (!searchQuery) {
+      setError("Please enter a company name or ticker symbol");
+      return;
+    }
+
+    setSearching(true);
+    setError("");
+
+    try {
+      const result = await resolveTicker(searchQuery);
+
+      if (result?.resolved && result?.ticker) {
+        navigateToStock(result.ticker);
+        return;
+      }
+
+      setError(result?.warning || "Could not resolve company name to ticker.");
+    } catch (searchError) {
+      devWarn("failed API name:", "ticker resolver", searchError);
+      navigateToStock(searchQuery);
+    } finally {
+      setSearching(false);
+    }
   };
 
   const fetchStockData = async (period = chartPeriod, requestedTicker) => {
@@ -336,7 +367,8 @@ function Dashboard() {
       <SearchBar
         ticker={ticker}
         onTickerChange={setTicker}
-        onSearch={() => navigateToStock(ticker)}
+        onSearch={handleSearch}
+        searching={searching}
       />
     </section>
   );
@@ -388,7 +420,8 @@ function Dashboard() {
           <SearchBar
             ticker={ticker}
             onTickerChange={setTicker}
-            onSearch={() => navigateToStock(ticker)}
+            onSearch={handleSearch}
+            searching={searching}
           />
         </header>
 
@@ -408,6 +441,13 @@ function Dashboard() {
             loading={companyLoading}
             error={companyError}
           />
+
+          {selectedTicker && (
+            <AIResearchAssistant
+              key={selectedTicker}
+              ticker={selectedTicker}
+            />
+          )}
 
           {historyLoading && historyData.length === 0 && <SkeletonChart />}
 

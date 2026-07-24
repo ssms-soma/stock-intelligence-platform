@@ -1,4 +1,4 @@
-function SearchBar({ ticker, onTickerChange, onSearch }) {
+function SearchBar({ ticker, onTickerChange, onSearch, searching = false }) {
   return (
     <form
       onSubmit={(event) => {
@@ -14,9 +14,10 @@ function SearchBar({ ticker, onTickerChange, onSearch }) {
     >
       <input
         type="text"
-        placeholder="Enter ticker, e.g. AAPL or INFY.NS"
+        placeholder="Enter company or ticker, e.g. Infosys or AAPL"
         value={ticker}
         onChange={(e) => onTickerChange(e.target.value)}
+        disabled={searching}
         style={{
           boxSizing: "border-box",
           flex: "1 1 280px",
@@ -32,6 +33,7 @@ function SearchBar({ ticker, onTickerChange, onSearch }) {
 
       <button
         type="submit"
+        disabled={searching}
         style={{
           padding: "0.85rem 1.2rem",
           border: "1px solid #0f172a",
@@ -39,10 +41,11 @@ function SearchBar({ ticker, onTickerChange, onSearch }) {
           background: "#0f172a",
           color: "#ffffff",
           fontWeight: 700,
-          cursor: "pointer",
+          cursor: searching ? "wait" : "pointer",
+          opacity: searching ? 0.7 : 1,
         }}
       >
-        Search
+        {searching ? "Searching..." : "Search"}
       </button>
     </form>
   );

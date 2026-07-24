@@ -1,12 +1,16 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
+from app.api.routes.chat_routes import router as chat_router
 from app.api.routes.company_routes import router as company_router
 from app.api.routes.health_routes import router as health_router
+from app.api.routes.llm_routes import router as llm_router
 from app.api.routes.news_routes import router as news_router
+from app.api.routes.rag_routes import router as rag_router
 from app.api.routes.recommendation_routes import router as recommendation_router
 from app.api.routes.research_routes import router as research_router
 from app.api.routes.router_routes import router as router_router
+from app.api.routes.search_routes import router as search_router
 from app.api.routes.sentiment_routes import router as sentiment_router
 from app.api.routes.stock_routes import router as stock_router
 
@@ -25,10 +29,14 @@ app.add_middleware(
 )
 
 app.include_router(health_router, prefix="/api")
+app.include_router(chat_router, prefix="/api")
 app.include_router(stock_router, prefix="/api")
 app.include_router(company_router, prefix="/api")
 app.include_router(news_router, prefix="/api")
+app.include_router(rag_router, prefix="/api")
 app.include_router(recommendation_router, prefix="/api")
 app.include_router(research_router, prefix="/api")
 app.include_router(router_router, prefix="/api")
+app.include_router(search_router, prefix="/api")
 app.include_router(sentiment_router, prefix="/api")
+app.include_router(llm_router, prefix="/api")
