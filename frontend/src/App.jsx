@@ -38,8 +38,11 @@ function App() {
   return (
     <BrowserRouter>
       <Routes>
-        <Route path="/" element={<Dashboard />} />
-        <Route path="/stock/:ticker" element={<Dashboard />} />
+        <Route path="/" element={<Dashboard key="landing" />} />
+        <Route
+          path="/stock/:ticker"
+          element={<Dashboard key="stock-detail" />}
+        />
         <Route path="*" element={<NotFound />} />
       </Routes>
     </BrowserRouter>

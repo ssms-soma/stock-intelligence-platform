@@ -44,12 +44,13 @@ class StockService:
             normalized_ticker,
             normalized_period,
         )
-        self._set_cached(
-            self._history_cache,
-            cache_key,
-            history_data,
-            STOCK_HISTORY_TTL_SECONDS,
-        )
+        if history_data:
+            self._set_cached(
+                self._history_cache,
+                cache_key,
+                history_data,
+                STOCK_HISTORY_TTL_SECONDS,
+            )
         return history_data
 
     def _get_cached(self, cache, key):

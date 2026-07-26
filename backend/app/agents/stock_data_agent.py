@@ -53,6 +53,9 @@ class StockDataAgent:
             latest_price = latest_price or price_snapshot["latest_price"]
             previous_close = previous_close or price_snapshot["previous_close"]
 
+        latest_price = self._safe_float(latest_price)
+        previous_close = self._safe_float(previous_close)
+
         info = self._safe_call(
             lambda: stock.info,
             timeout_seconds=self.INFO_TIMEOUT_SECONDS,
@@ -78,34 +81,42 @@ class StockDataAgent:
                 latest_price,
                 previous_close,
             ),
-            "market_cap": self._get_fast_info_value(
-                fast_info,
-                "market_cap",
-                "marketCap",
-            )
-            or info.get("marketCap"),
-            "pe_ratio": info.get("trailingPE"),
-            "fifty_two_week_high": self._get_fast_info_value(
-                fast_info,
-                "year_high",
-                "yearHigh",
-                "fiftyTwoWeekHigh",
-            )
-            or info.get("fiftyTwoWeekHigh"),
-            "fifty_two_week_low": self._get_fast_info_value(
-                fast_info,
-                "year_low",
-                "yearLow",
-                "fiftyTwoWeekLow",
-            )
-            or info.get("fiftyTwoWeekLow"),
-            "volume": self._get_fast_info_value(
-                fast_info,
-                "last_volume",
-                "lastVolume",
-                "regularMarketVolume",
-            )
-            or info.get("volume"),
+            "market_cap": self._first_finite_number(
+                self._get_fast_info_value(
+                    fast_info,
+                    "market_cap",
+                    "marketCap",
+                ),
+                info.get("marketCap"),
+            ),
+            "pe_ratio": self._safe_float(info.get("trailingPE")),
+            "fifty_two_week_high": self._first_finite_number(
+                self._get_fast_info_value(
+                    fast_info,
+                    "year_high",
+                    "yearHigh",
+                    "fiftyTwoWeekHigh",
+                ),
+                info.get("fiftyTwoWeekHigh"),
+            ),
+            "fifty_two_week_low": self._first_finite_number(
+                self._get_fast_info_value(
+                    fast_info,
+                    "year_low",
+                    "yearLow",
+                    "fiftyTwoWeekLow",
+                ),
+                info.get("fiftyTwoWeekLow"),
+            ),
+            "volume": self._first_finite_number(
+                self._get_fast_info_value(
+                    fast_info,
+                    "last_volume",
+                    "lastVolume",
+                    "regularMarketVolume",
+                ),
+                info.get("volume"),
+            ),
             "sector": info.get("sector") or "N/A",
             "market": market_metadata["market"],
             "country": market_metadata["country"],
@@ -129,18 +140,44 @@ class StockDataAgent:
         )
 
         if history is None or history.empty:
+            history = self._safe_call(
+                lambda: yf.download(
+                    ticker,
+                    period=period,
+                    progress=False,
+                    threads=False,
+                    timeout=self.HISTORY_TIMEOUT_SECONDS,
+                ),
+                timeout_seconds=self.HISTORY_TIMEOUT_SECONDS + 2,
+                label=f"download:history:{period}",
+                ticker=ticker,
+            )
+
+        if history is None or history.empty:
             return []
 
         return [
             {
                 "date": index.strftime("%Y-%m-%d"),
-                "open": self._round_price(row.get("Open")),
-                "high": self._round_price(row.get("High")),
-                "low": self._round_price(row.get("Low")),
-                "close": self._round_price(row.get("Close")),
-                "volume": self._safe_int(row.get("Volume")),
+                "open": self._round_price(
+                    self._get_row_value(row, "Open", ticker)
+                ),
+                "high": self._round_price(
+                    self._get_row_value(row, "High", ticker)
+                ),
+                "low": self._round_price(
+                    self._get_row_value(row, "Low", ticker)
+                ),
+                "close": self._round_price(
+                    self._get_row_value(row, "Close", ticker)
+                ),
+                "volume": self._safe_int(
+                    self._get_row_value(row, "Volume", ticker)
+                ),
             }
             for index, row in history.iterrows()
+            if self._round_price(self._get_row_value(row, "Close", ticker))
+            is not None
         ]
 
     def _get_download_price_snapshot(self, ticker: str):
@@ -279,9 +316,6 @@ class StockDataAgent:
         except IndexError:
             return None
 
-        if field in row:
-            return row.get(field)
-
         multi_key = (field, ticker)
         if multi_key in row:
             return row.get(multi_key)
@@ -290,6 +324,30 @@ class StockDataAgent:
             if isinstance(key, tuple) and key[0] == field:
                 return value
 
+        if field in row:
+            return row.get(field)
+
+        return None
+
+    def _get_row_value(self, row, field: str, ticker: str):
+        multi_key = (field, ticker)
+        if multi_key in row:
+            return row.get(multi_key)
+
+        for key, value in row.items():
+            if isinstance(key, tuple) and key[0] == field:
+                return value
+
+        if field in row:
+            return row.get(field)
+
+        return None
+
+    def _first_finite_number(self, *values):
+        for value in values:
+            number_value = self._safe_float(value)
+            if number_value is not None:
+                return number_value
         return None
 
     def _calculate_price_change(self, latest_price, previous_close):

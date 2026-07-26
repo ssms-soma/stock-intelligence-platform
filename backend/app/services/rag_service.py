@@ -42,53 +42,102 @@ class RAGService:
                 warning=validation_warning,
             )
 
-        rag_documents = [
-            RAGDocument(
-                document_id=str(document.get("document_id") or "").strip(),
-                title=str(document.get("title") or "").strip(),
-                source_type=str(document.get("source_type") or "").strip(),
-                text=document.get("text") or "",
-                page=document.get("page"),
-                metadata=document.get("metadata")
-                if isinstance(document.get("metadata"), dict)
-                else {},
-            )
-            for document in document_data
-        ]
-        chunks = self.chunker.chunk_documents(rag_documents)
-
-        if not chunks:
+        rag_documents = [self._to_rag_document(document) for document in document_data]
+        index_result = self.index_documents(rag_documents)
+        if index_result["warning"]:
             return self._response(
                 query=cleaned_query,
                 retrieval_k=retrieval_k,
-                warning="No usable document text was provided.",
+                embedding_model=index_result["embedding_model"],
+                warning=index_result["warning"],
             )
 
-        chunk_embedding_response = self.embedding_provider.embed(
+        return self.query_index(
+            query=cleaned_query,
+            vector_store=index_result["vector_store"],
+            top_k=retrieval_k,
+            embedding_model=index_result["embedding_model"],
+            mode="rag_test",
+        )
+
+    def index_documents(self, documents, vector_store=None):
+        chunks = self.chunker.chunk_documents(documents)
+        if not chunks:
+            return self._index_response(
+                warning="No usable document text was provided."
+            )
+
+        embedding_response = self.embedding_provider.embed(
             [chunk.text for chunk in chunks]
         )
-        if chunk_embedding_response.warning or not chunk_embedding_response.embeddings:
-            return self._response(
-                query=cleaned_query,
-                retrieval_k=retrieval_k,
-                embedding_model=chunk_embedding_response.model,
-                warning=chunk_embedding_response.warning
+        if embedding_response.warning or not embedding_response.embeddings:
+            return self._index_response(
+                embedding_provider=embedding_response.provider,
+                embedding_model=embedding_response.model,
+                warning=embedding_response.warning
                 or "Document embeddings are unavailable.",
             )
 
-        query_embedding_response = self.embedding_provider.embed([cleaned_query])
-        if query_embedding_response.warning or not query_embedding_response.embeddings:
+        target_store = vector_store or InMemoryVectorStore()
+        try:
+            target_store.add(chunks, embedding_response.embeddings)
+        except ValueError as error:
+            return self._index_response(
+                embedding_provider=embedding_response.provider,
+                embedding_model=embedding_response.model,
+                warning=f"Vector indexing failed: {error}",
+            )
+
+        return self._index_response(
+            vector_store=target_store,
+            chunks=chunks,
+            embedding_provider=embedding_response.provider,
+            embedding_model=embedding_response.model,
+        )
+
+    def query_index(
+        self,
+        query,
+        vector_store,
+        top_k=None,
+        embedding_model=None,
+        mode="uploaded_document_rag",
+    ):
+        cleaned_query = query.strip() if isinstance(query, str) else ""
+        retrieval_k = self._retrieval_k(top_k)
+        if not cleaned_query:
             return self._response(
                 query=cleaned_query,
                 retrieval_k=retrieval_k,
-                embedding_model=query_embedding_response.model,
+                embedding_model=embedding_model,
+                mode=mode,
+                warning="A non-empty query is required.",
+            )
+        if len(cleaned_query) > self.MAX_QUERY_CHARACTERS:
+            return self._response(
+                query=cleaned_query,
+                retrieval_k=retrieval_k,
+                embedding_model=embedding_model,
+                mode=mode,
+                warning="Query exceeds the maximum allowed length.",
+            )
+
+        query_embedding_response = self.embedding_provider.embed([cleaned_query])
+        if (
+            query_embedding_response.warning
+            or not query_embedding_response.embeddings
+        ):
+            return self._response(
+                query=cleaned_query,
+                retrieval_k=retrieval_k,
+                embedding_model=embedding_model
+                or query_embedding_response.model,
+                mode=mode,
                 warning=query_embedding_response.warning
                 or "Query embedding is unavailable.",
             )
 
-        vector_store = InMemoryVectorStore()
         try:
-            vector_store.add(chunks, chunk_embedding_response.embeddings)
             retrieval_results = self.rag_agent.retrieve(
                 vector_store,
                 query_embedding_response.embeddings[0],
@@ -98,7 +147,8 @@ class RAGService:
             return self._response(
                 query=cleaned_query,
                 retrieval_k=retrieval_k,
-                embedding_model=chunk_embedding_response.model,
+                embedding_model=embedding_model,
+                mode=mode,
                 warning=f"Vector retrieval failed: {error}",
             )
 
@@ -109,7 +159,8 @@ class RAGService:
                 query=cleaned_query,
                 sources=sources,
                 retrieval_k=retrieval_k,
-                embedding_model=chunk_embedding_response.model,
+                embedding_model=embedding_model,
+                mode=mode,
                 warning="No relevant document chunks were retrieved.",
             )
 
@@ -125,16 +176,29 @@ class RAGService:
             },
         )
         llm_warning = llm_result.get("warning")
-        answer = None if llm_warning else llm_result.get("response")
 
         return self._response(
-            answer=answer,
+            answer=None if llm_warning else llm_result.get("response"),
             query=cleaned_query,
             sources=sources,
             model=llm_result.get("model"),
-            embedding_model=chunk_embedding_response.model,
+            embedding_model=embedding_model,
             retrieval_k=retrieval_k,
+            mode=mode,
             warning=llm_warning,
+        )
+
+    @staticmethod
+    def _to_rag_document(document):
+        return RAGDocument(
+            document_id=str(document.get("document_id") or "").strip(),
+            title=str(document.get("title") or "").strip(),
+            source_type=str(document.get("source_type") or "").strip(),
+            text=document.get("text") or "",
+            page=document.get("page"),
+            metadata=document.get("metadata")
+            if isinstance(document.get("metadata"), dict)
+            else {},
         )
 
     def _validate_request(self, query, documents):
@@ -180,6 +244,7 @@ class RAGService:
         sources=None,
         model=None,
         embedding_model=None,
+        mode="rag_test",
         warning=None,
     ):
         return {
@@ -191,7 +256,23 @@ class RAGService:
                 "embedding_model": embedding_model
                 or getattr(self.embedding_provider, "model", None),
                 "retrieval_k": retrieval_k,
-                "mode": "rag_test",
+                "mode": mode,
             },
+            "warning": warning,
+        }
+
+    @staticmethod
+    def _index_response(
+        vector_store=None,
+        chunks=None,
+        embedding_provider=None,
+        embedding_model=None,
+        warning=None,
+    ):
+        return {
+            "vector_store": vector_store,
+            "chunks": chunks or [],
+            "embedding_provider": embedding_provider,
+            "embedding_model": embedding_model,
             "warning": warning,
         }

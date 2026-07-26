@@ -36,10 +36,10 @@ class NewsAgent:
                 timeout=10,
             )
             response.raise_for_status()
-        except requests.RequestException as error:
+        except requests.RequestException:
             return {
                 "articles": [],
-                "warning": f"NewsAPI request failed: {error}",
+                "warning": "NewsAPI is temporarily unavailable.",
             }
 
         articles = response.json().get("articles", [])

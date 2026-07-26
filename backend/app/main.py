@@ -3,6 +3,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.api.routes.chat_routes import router as chat_router
 from app.api.routes.company_routes import router as company_router
+from app.api.routes.document_routes import router as document_router
 from app.api.routes.health_routes import router as health_router
 from app.api.routes.llm_routes import router as llm_router
 from app.api.routes.news_routes import router as news_router
@@ -32,6 +33,7 @@ app.include_router(health_router, prefix="/api")
 app.include_router(chat_router, prefix="/api")
 app.include_router(stock_router, prefix="/api")
 app.include_router(company_router, prefix="/api")
+app.include_router(document_router, prefix="/api")
 app.include_router(news_router, prefix="/api")
 app.include_router(rag_router, prefix="/api")
 app.include_router(recommendation_router, prefix="/api")

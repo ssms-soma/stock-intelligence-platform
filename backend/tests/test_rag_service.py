@@ -2,6 +2,7 @@ import unittest
 
 from app.embeddings.base import EmbeddingResponse
 from app.rag.chunker import TextChunker
+from app.rag.models import RAGDocument
 from app.services.rag_service import RAGService
 
 
@@ -134,6 +135,30 @@ class RAGServiceTests(unittest.TestCase):
 
         self.assertIn("query", blank_query["warning"])
         self.assertIn("document", no_documents["warning"])
+
+    def test_reuses_index_for_uploaded_document_mode(self):
+        service = self._service()
+        rag_documents = [
+            RAGDocument(
+                document_id="infosys",
+                title="Infosys overview",
+                source_type="uploaded_text",
+                text="Infosys provides consulting services.",
+            )
+        ]
+
+        indexed = service.index_documents(rag_documents)
+        result = service.query_index(
+            query="What does Infosys provide?",
+            vector_store=indexed["vector_store"],
+            top_k=1,
+            embedding_model=indexed["embedding_model"],
+            mode="uploaded_document_rag",
+        )
+
+        self.assertIsNone(indexed["warning"])
+        self.assertEqual(result["metadata"]["mode"], "uploaded_document_rag")
+        self.assertEqual(result["sources"][0]["document_id"], "infosys")
 
 
 if __name__ == "__main__":

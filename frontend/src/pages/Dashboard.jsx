@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { fetchCompanyProfile } from "../api/companyApi";
 import { fetchCompanyNews } from "../api/newsApi";
@@ -112,29 +112,6 @@ function Dashboard() {
     };
   }, [selectedTicker, researchRequestId]);
 
-  useEffect(() => {
-    if (!routeTicker) {
-      setSelectedTicker("");
-      setStockData(null);
-      setHistoryData([]);
-      setCompanyData(null);
-      setCompanyError("");
-      setCompanyLoading(false);
-      setNewsData([]);
-      setResearchData(null);
-      setResearchError("");
-      setResearchLoading(false);
-      setStockError("");
-      setHistoryError("");
-      setStockLoading(false);
-      setHistoryLoading(false);
-      setChartPeriod("6mo");
-      return;
-    }
-
-    fetchStockData("6mo", routeTicker);
-  }, [routeTicker]);
-
   const navigateToStock = (requestedTicker = ticker) => {
     const trimmedTicker = requestedTicker.trim();
 
@@ -183,7 +160,7 @@ function Dashboard() {
     }
   };
 
-  const fetchStockData = async (period = chartPeriod, requestedTicker) => {
+  const fetchStockData = useCallback(async (period, requestedTicker) => {
     const trimmedTicker = requestedTicker.trim();
 
     if (!trimmedTicker) {
@@ -304,7 +281,25 @@ function Dashboard() {
         setLoading(false);
       }
     }
-  };
+  }, []);
+
+  useEffect(() => {
+    if (!routeTicker) {
+      return;
+    }
+
+    let isCurrent = true;
+
+    Promise.resolve().then(() => {
+      if (isCurrent) {
+        fetchStockData("6mo", routeTicker);
+      }
+    });
+
+    return () => {
+      isCurrent = false;
+    };
+  }, [fetchStockData, routeTicker]);
 
   const handleTickerSelect = (nextTicker) => {
     navigateToStock(nextTicker);

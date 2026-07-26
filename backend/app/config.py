@@ -33,6 +33,11 @@ def _get_int(name: str, default: int):
         return default
 
 
+def _get_positive_int(name: str, default: int):
+    value = _get_int(name, default)
+    return value if value > 0 else default
+
+
 class Settings(BaseModel):
     app_name: str = "AI Stock Intelligence Platform"
     environment: str = os.getenv("ENVIRONMENT", "development")
@@ -56,6 +61,18 @@ class Settings(BaseModel):
     rag_chunk_size: int = _get_int("RAG_CHUNK_SIZE", 1000)
     rag_chunk_overlap: int = _get_int("RAG_CHUNK_OVERLAP", 150)
     rag_retrieval_k: int = _get_int("RAG_RETRIEVAL_K", 5)
+    document_upload_max_bytes: int = _get_positive_int(
+        "DOCUMENT_UPLOAD_MAX_BYTES",
+        1_048_576,
+    )
+    document_text_max_chars: int = _get_positive_int(
+        "DOCUMENT_TEXT_MAX_CHARS",
+        100_000,
+    )
+    document_index_max_documents: int = _get_positive_int(
+        "DOCUMENT_INDEX_MAX_DOCUMENTS",
+        25,
+    )
 
 
 settings = Settings()
