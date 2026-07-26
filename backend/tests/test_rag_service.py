@@ -160,6 +160,33 @@ class RAGServiceTests(unittest.TestCase):
         self.assertEqual(result["metadata"]["mode"], "uploaded_document_rag")
         self.assertEqual(result["sources"][0]["document_id"], "infosys")
 
+    def test_page_aware_source_is_preserved(self):
+        service = self._service()
+        indexed = service.index_documents(
+            [
+                RAGDocument(
+                    document_id="report",
+                    title="Annual report",
+                    source_type="uploaded_pdf",
+                    text="Infosys reported revenue growth.",
+                    page=12,
+                )
+            ]
+        )
+
+        result = service.query_index(
+            query="What grew?",
+            vector_store=indexed["vector_store"],
+            top_k=1,
+            embedding_model=indexed["embedding_model"],
+        )
+
+        self.assertEqual(result["sources"][0]["page"], 12)
+        self.assertEqual(
+            result["sources"][0]["chunk_id"],
+            "report:page:12:chunk:0",
+        )
+
 
 if __name__ == "__main__":
     unittest.main()

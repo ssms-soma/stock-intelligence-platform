@@ -40,6 +40,21 @@ class TextChunkerTests(unittest.TestCase):
         self.assertEqual(chunker.chunk_size, 4)
         self.assertEqual(chunker.chunk_overlap, 3)
 
+    def test_page_aware_chunk_ids_are_unique(self):
+        chunker = TextChunker(chunk_size=100, chunk_overlap=0)
+        documents = [
+            RAGDocument("doc-1", "Report", "uploaded_pdf", "Page one", page=1),
+            RAGDocument("doc-1", "Report", "uploaded_pdf", "Page two", page=2),
+        ]
+
+        chunks = chunker.chunk_documents(documents)
+
+        self.assertEqual(
+            [chunk.chunk_id for chunk in chunks],
+            ["doc-1:page:1:chunk:0", "doc-1:page:2:chunk:0"],
+        )
+        self.assertEqual([chunk.page for chunk in chunks], [1, 2])
+
 
 if __name__ == "__main__":
     unittest.main()

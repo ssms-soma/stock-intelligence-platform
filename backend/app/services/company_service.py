@@ -23,12 +23,13 @@ class CompanyService:
             return cached
 
         company_profile = self.company_agent.get_company_profile(normalized_ticker)
-        self._set_cached(
-            self._company_cache,
-            normalized_ticker,
-            company_profile,
-            COMPANY_PROFILE_TTL_SECONDS,
-        )
+        if self._has_usable_company_profile(company_profile):
+            self._set_cached(
+                self._company_cache,
+                normalized_ticker,
+                company_profile,
+                COMPANY_PROFILE_TTL_SECONDS,
+            )
         return company_profile
 
     def _get_cached(self, cache, key):
@@ -51,3 +52,23 @@ class CompanyService:
 
     def _normalize_ticker(self, ticker: str):
         return ticker.strip().upper() if ticker else ""
+
+    def _has_usable_company_profile(self, company_response):
+        if not isinstance(company_response, dict) or company_response.get("warning"):
+            return False
+
+        profile = company_response.get("company_profile")
+        if not isinstance(profile, dict):
+            return False
+
+        company_fields = (
+            "name",
+            "long_name",
+            "short_name",
+            "sector",
+            "industry",
+            "website",
+            "business_summary",
+            "description",
+        )
+        return any(profile.get(field) for field in company_fields)

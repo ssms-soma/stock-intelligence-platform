@@ -28,13 +28,21 @@ class TextChunker:
             if not chunk_text:
                 continue
 
+            chunk_id = (
+                f"{document.document_id}:page:{document.page}:chunk:{index}"
+                if (
+                    document.source_type == "uploaded_pdf"
+                    and document.page is not None
+                )
+                else f"{document.document_id}:chunk:{index}"
+            )
             chunks.append(
                 RAGChunk(
                     document_id=document.document_id,
                     title=document.title,
                     source_type=document.source_type,
                     text=chunk_text,
-                    chunk_id=f"{document.document_id}:chunk:{index}",
+                    chunk_id=chunk_id,
                     page=document.page,
                     metadata=dict(document.metadata),
                 )

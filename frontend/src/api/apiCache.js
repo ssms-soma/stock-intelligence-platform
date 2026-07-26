@@ -32,6 +32,10 @@ export function setCached(key, data, ttlMs) {
   return data;
 }
 
+export function deleteCached(key) {
+  cacheStore.delete(key);
+}
+
 export async function getOrFetch(key, fetcher, ttlMs) {
   const cached = getCached(key);
 

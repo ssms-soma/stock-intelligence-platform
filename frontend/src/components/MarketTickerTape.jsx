@@ -65,8 +65,20 @@ function TrendMarker({ direction }) {
 }
 
 function getStockTrend(stock) {
-  const change = Number(stock?.price_change);
-  const changePercent = Number(stock?.price_change_percent);
+  const rawChange = stock?.price_change;
+  const rawChangePercent = stock?.price_change_percent;
+
+  if (
+    rawChange === null ||
+    rawChange === undefined ||
+    rawChangePercent === null ||
+    rawChangePercent === undefined
+  ) {
+    return null;
+  }
+
+  const change = Number(rawChange);
+  const changePercent = Number(rawChangePercent);
 
   if (!Number.isFinite(change) || !Number.isFinite(changePercent)) {
     return null;

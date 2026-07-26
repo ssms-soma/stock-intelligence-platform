@@ -29,6 +29,8 @@ class DocumentService:
         self.loader = loader or TextDocumentLoader(
             max_bytes=settings.document_upload_max_bytes,
             max_characters=settings.document_text_max_chars,
+            pdf_max_pages=settings.pdf_max_pages,
+            pdf_min_extracted_characters=settings.pdf_min_extracted_chars,
         )
         self.index_store = index_store or DocumentIndexStore(
             max_documents=settings.document_index_max_documents,
@@ -44,21 +46,31 @@ class DocumentService:
             )
 
         document_id = uuid4().hex
-        source_type = "uploaded_text"
-        rag_document = RAGDocument(
-            document_id=document_id,
-            title=loaded.title,
-            source_type=source_type,
-            text=loaded.text,
-            metadata={
-                "extension": loaded.extension,
-                "content_type": loaded.content_type,
-            },
+        is_pdf = loaded.extension == ".pdf"
+        source_type = "uploaded_pdf" if is_pdf else "uploaded_text"
+        rag_documents = [
+            RAGDocument(
+                document_id=document_id,
+                title=loaded.title,
+                source_type=source_type,
+                text=unit.text,
+                page=unit.page,
+                metadata={
+                    "extension": loaded.extension,
+                    "content_type": loaded.content_type,
+                },
+            )
+            for unit in loaded.units
+        ]
+        pages_indexed = (
+            len([unit for unit in loaded.units if unit.page is not None])
+            if is_pdf
+            else None
         )
-        index_result = self.rag_service.index_documents([rag_document])
+        index_result = self.rag_service.index_documents(rag_documents)
 
         if index_result["warning"] or not index_result["vector_store"]:
-            return {
+            response = {
                 "document_id": document_id,
                 "title": loaded.title,
                 "source_type": source_type,
@@ -68,6 +80,9 @@ class DocumentService:
                 "warning": index_result["warning"]
                 or "Document indexing is unavailable.",
             }
+            if is_pdf:
+                response["pages_indexed"] = pages_indexed
+            return response
 
         indexed_document = IndexedDocument(
             document_id=document_id,
@@ -75,8 +90,9 @@ class DocumentService:
             source_type=source_type,
             extension=loaded.extension,
             content_type=loaded.content_type,
-            character_count=len(loaded.text),
+            character_count=sum(len(unit.text) for unit in loaded.units),
             chunk_count=len(index_result["chunks"]),
+            pages_indexed=pages_indexed,
             embedding_provider=index_result["embedding_provider"],
             embedding_model=index_result["embedding_model"],
             created_at=datetime.now(timezone.utc),
@@ -87,7 +103,7 @@ class DocumentService:
         except DocumentIndexStoreFullError as error:
             raise DocumentServiceError(str(error), status_code=409) from error
 
-        return {
+        response = {
             "document_id": document_id,
             "title": loaded.title,
             "source_type": source_type,
@@ -96,6 +112,9 @@ class DocumentService:
             "status": "indexed",
             "warning": self.MEMORY_WARNING,
         }
+        if is_pdf:
+            response["pages_indexed"] = indexed_document.pages_indexed
+        return response
 
     def ask_document(self, document_id, question, top_k=None):
         normalized_document_id = (

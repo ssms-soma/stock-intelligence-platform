@@ -91,9 +91,14 @@ function AIResearchAssistant({ ticker }) {
     cancelAnswerRequest();
     clearAnswerState();
 
-    if (file && !filename.endsWith(".txt") && !filename.endsWith(".md")) {
+    if (
+      file &&
+      !filename.endsWith(".txt") &&
+      !filename.endsWith(".md") &&
+      !filename.endsWith(".pdf")
+    ) {
       setSelectedFile(null);
-      setUploadError("Upload a .txt or .md file.");
+      setUploadError("Upload a .txt, .md, or .pdf file.");
       event.target.value = "";
       return;
     }
@@ -103,7 +108,7 @@ function AIResearchAssistant({ ticker }) {
 
   const handleUpload = async () => {
     if (!selectedFile) {
-      setUploadError("Upload a .txt or .md file.");
+      setUploadError("Upload a .txt, .md, or .pdf file.");
       return;
     }
 
@@ -152,6 +157,9 @@ function AIResearchAssistant({ ticker }) {
         chunks_indexed: Number.isFinite(response?.chunks_indexed)
           ? response.chunks_indexed
           : 0,
+        pages_indexed: Number.isFinite(response?.pages_indexed)
+          ? response.pages_indexed
+          : null,
       });
       setUploadWarning(
         typeof response?.warning === "string" ? response.warning : ""
@@ -315,7 +323,10 @@ function AIResearchAssistant({ ticker }) {
           <div>
             <p className="ai-assistant-document-title">Document Q&amp;A</p>
             <p className="ai-assistant-document-help">
-              Upload a temporary UTF-8 .txt or .md document.
+              Upload a .txt, .md, or text-based .pdf file.
+            </p>
+            <p className="ai-assistant-document-help">
+              Text-based PDFs only. Scanned PDFs are not supported yet.
             </p>
           </div>
         </div>
@@ -324,7 +335,7 @@ function AIResearchAssistant({ ticker }) {
           <input
             ref={fileInputRef}
             type="file"
-            accept=".txt,.md,text/plain,text/markdown"
+            accept=".txt,.md,.pdf,text/plain,text/markdown,application/pdf"
             disabled={controlsDisabled}
             onChange={handleFileChange}
           />
@@ -356,6 +367,13 @@ function AIResearchAssistant({ ticker }) {
                 {uploadedDocument.title}
               </span>
               <span className="ai-assistant-document-count">
+                {uploadedDocument.pages_indexed !== null && (
+                  <>
+                    {uploadedDocument.pages_indexed}{" "}
+                    {uploadedDocument.pages_indexed === 1 ? "page" : "pages"}
+                    {" \u00b7 "}
+                  </>
+                )}
                 {uploadedDocument.chunks_indexed}{" "}
                 {uploadedDocument.chunks_indexed === 1 ? "chunk" : "chunks"} indexed
               </span>
@@ -451,9 +469,15 @@ function AIResearchAssistant({ ticker }) {
                 <ul>
                   {sources.map((source, index) => {
                     const score = Number(source?.score);
+                    const page = Number(source?.page);
+                    const hasPage =
+                      source?.page !== null &&
+                      source?.page !== undefined &&
+                      Number.isFinite(page);
                     return (
                       <li key={source?.chunk_id || `${source?.title}-${index}`}>
                         <span>{source?.title || "Uploaded document"}</span>
+                        {hasPage && <span>Page {page}</span>}
                         {source?.chunk_id && <span>{source.chunk_id}</span>}
                         {Number.isFinite(score) && (
                           <span>Score: {score.toFixed(3)}</span>

@@ -1,19 +1,43 @@
 import unittest
 
 from app.documents.index_store import DocumentIndexStore
-from app.documents.models import LoadedDocument
+from app.documents.models import LoadedDocument, LoadedDocumentUnit
 from app.rag.models import RAGChunk
 from app.rag.vector_store import InMemoryVectorStore
 from app.services.document_service import DocumentService, DocumentServiceError
 
 
 class FakeLoader:
+    def __init__(self, extension=".txt"):
+        self.extension = extension
+
     async def load(self, upload_file):
         return LoadedDocument(
             title="annual-report",
-            extension=".txt",
-            content_type="text/plain",
-            text="Revenue grew during the year.",
+            extension=self.extension,
+            content_type=(
+                "application/pdf"
+                if self.extension == ".pdf"
+                else "text/plain"
+            ),
+            units=(
+                [
+                    LoadedDocumentUnit(
+                        text="Revenue grew during the year.",
+                        page=1,
+                    ),
+                    LoadedDocumentUnit(
+                        text="Cloud services also grew.",
+                        page=2,
+                    ),
+                ]
+                if self.extension == ".pdf"
+                else [
+                    LoadedDocumentUnit(
+                        text="Revenue grew during the year."
+                    )
+                ]
+            ),
         )
 
 
@@ -32,19 +56,26 @@ class FakeRAGService:
                 "embedding_model": "fake-embedding",
                 "warning": self.index_warning,
             }
-        document = documents[0]
-        chunk = RAGChunk(
-            document_id=document.document_id,
-            title=document.title,
-            source_type=document.source_type,
-            text=document.text,
-            chunk_id=f"{document.document_id}:chunk:0",
-        )
+        chunks = [
+            RAGChunk(
+                document_id=document.document_id,
+                title=document.title,
+                source_type=document.source_type,
+                text=document.text,
+                chunk_id=(
+                    f"{document.document_id}:page:{document.page}:chunk:0"
+                    if document.page is not None
+                    else f"{document.document_id}:chunk:0"
+                ),
+                page=document.page,
+            )
+            for document in documents
+        ]
         store = InMemoryVectorStore()
-        store.add([chunk], [[1.0, 0.0]])
+        store.add(chunks, [[1.0, 0.0] for chunk in chunks])
         return {
             "vector_store": store,
-            "chunks": [chunk],
+            "chunks": chunks,
             "embedding_provider": "fake",
             "embedding_model": "fake-embedding",
             "warning": None,
@@ -78,9 +109,9 @@ class FakeRAGService:
 
 
 class DocumentServiceTests(unittest.IsolatedAsyncioTestCase):
-    def _service(self, rag_service=None):
+    def _service(self, rag_service=None, extension=".txt"):
         return DocumentService(
-            loader=FakeLoader(),
+            loader=FakeLoader(extension=extension),
             index_store=DocumentIndexStore(max_documents=2),
             rag_service=rag_service or FakeRAGService(),
         )
@@ -95,6 +126,20 @@ class DocumentServiceTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(result["embedding_model"], "fake-embedding")
         self.assertIn("process memory", result["warning"])
         self.assertIsNotNone(service.index_store.get(result["document_id"]))
+        self.assertNotIn("pages_indexed", result)
+
+    async def test_pdf_upload_preserves_pages_and_source_type(self):
+        service = self._service(extension=".pdf")
+
+        result = await service.upload_document(object())
+        stored = service.index_store.get(result["document_id"])
+
+        self.assertEqual(result["source_type"], "uploaded_pdf")
+        self.assertEqual(result["pages_indexed"], 2)
+        self.assertEqual(stored.pages_indexed, 2)
+        chunks = [entry[0] for entry in stored.vector_store._entries]
+        self.assertEqual([chunk.page for chunk in chunks], [1, 2])
+        self.assertIn(":page:1:chunk:0", chunks[0].chunk_id)
 
     async def test_embedding_failure_does_not_store_document(self):
         service = self._service(FakeRAGService("Embeddings unavailable."))
@@ -103,6 +148,19 @@ class DocumentServiceTests(unittest.IsolatedAsyncioTestCase):
 
         self.assertEqual(result["status"], "not_indexed")
         self.assertEqual(result["warning"], "Embeddings unavailable.")
+        self.assertEqual(len(service.index_store), 0)
+
+    async def test_pdf_embedding_failure_does_not_store_document(self):
+        service = self._service(
+            FakeRAGService("Embeddings unavailable."),
+            extension=".pdf",
+        )
+
+        result = await service.upload_document(object())
+
+        self.assertEqual(result["status"], "not_indexed")
+        self.assertEqual(result["source_type"], "uploaded_pdf")
+        self.assertEqual(result["pages_indexed"], 2)
         self.assertEqual(len(service.index_store), 0)
 
     async def test_successful_ask_and_llm_failure_preserve_sources(self):

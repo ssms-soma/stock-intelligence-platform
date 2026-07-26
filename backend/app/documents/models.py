@@ -5,11 +5,17 @@ from app.rag.vector_store import InMemoryVectorStore
 
 
 @dataclass(frozen=True)
+class LoadedDocumentUnit:
+    text: str
+    page: int | None = None
+
+
+@dataclass(frozen=True)
 class LoadedDocument:
     title: str
     extension: str
     content_type: str
-    text: str
+    units: list[LoadedDocumentUnit]
 
 
 @dataclass
@@ -21,6 +27,7 @@ class IndexedDocument:
     content_type: str
     character_count: int
     chunk_count: int
+    pages_indexed: int | None
     embedding_provider: str | None
     embedding_model: str | None
     created_at: datetime

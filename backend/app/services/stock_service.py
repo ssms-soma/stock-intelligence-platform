@@ -23,12 +23,13 @@ class StockService:
             return cached
 
         stock_data = self.stock_agent.get_stock_data(normalized_ticker)
-        self._set_cached(
-            self._stock_cache,
-            cache_key,
-            stock_data,
-            STOCK_METRICS_TTL_SECONDS,
-        )
+        if self._has_meaningful_market_data(stock_data):
+            self._set_cached(
+                self._stock_cache,
+                cache_key,
+                stock_data,
+                STOCK_METRICS_TTL_SECONDS,
+            )
         return stock_data
 
     def get_stock_history(self, ticker: str, period: str = "6mo"):
@@ -73,3 +74,18 @@ class StockService:
 
     def _normalize_ticker(self, ticker: str):
         return ticker.strip().upper() if ticker else ""
+
+    def _has_meaningful_market_data(self, stock_data):
+        if not isinstance(stock_data, dict):
+            return False
+
+        market_fields = (
+            "current_price",
+            "previous_close",
+            "market_cap",
+            "pe_ratio",
+            "fifty_two_week_high",
+            "fifty_two_week_low",
+            "volume",
+        )
+        return any(stock_data.get(field) is not None for field in market_fields)

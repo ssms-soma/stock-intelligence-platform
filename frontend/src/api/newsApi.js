@@ -1,4 +1,4 @@
-import { getOrFetch } from "./apiCache";
+import { deleteCached, getOrFetch } from "./apiCache";
 
 const API_BASE_URL = "/api";
 const NEWS_TTL_MS = 5 * 60 * 1000;
@@ -16,7 +16,8 @@ export async function fetchCompanyNews(query, pageSize = 5) {
     return [];
   }
 
-  return getOrFetch(`news:${normalizedQuery}:${pageSize}`, async () => {
+  const cacheKey = `news:${normalizedQuery}:${pageSize}`;
+  const articles = await getOrFetch(cacheKey, async () => {
     const response = await fetch(
       `${API_BASE_URL}/news/${encodeURIComponent(normalizedQuery)}?page_size=${pageSize}`
     );
@@ -29,4 +30,10 @@ export async function fetchCompanyNews(query, pageSize = 5) {
 
     return response.json();
   }, NEWS_TTL_MS);
+
+  if (!Array.isArray(articles) || articles.length === 0) {
+    deleteCached(cacheKey);
+  }
+
+  return Array.isArray(articles) ? articles : [];
 }

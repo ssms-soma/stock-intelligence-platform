@@ -4,6 +4,10 @@ function renderValue(value, fallback = "N/A") {
 }
 
 function formatEmployees(value) {
+  if (value === null || value === undefined || value === "") {
+    return "N/A";
+  }
+
   const numberValue = Number(value);
 
   if (!Number.isFinite(numberValue)) {

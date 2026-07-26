@@ -18,6 +18,7 @@ def indexed_document(document_id):
         content_type="text/plain",
         character_count=8,
         chunk_count=1,
+        pages_indexed=None,
         embedding_provider="fake",
         embedding_model="fake-model",
         created_at=datetime.now(timezone.utc),

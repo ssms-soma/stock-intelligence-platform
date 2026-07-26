@@ -1,13 +1,18 @@
 import logging
 import math
 from concurrent.futures import ThreadPoolExecutor, TimeoutError
+from datetime import datetime, timezone
+from urllib.parse import quote
 
+import requests
 import yfinance as yf
 
+from app.agents.ticker_resolver_agent import TickerResolverAgent
 from app.utils.market_utils import get_market_metadata
 
 
 logger = logging.getLogger(__name__)
+logging.getLogger("yfinance").setLevel(logging.CRITICAL)
 
 
 class StockDataAgent:
@@ -67,10 +72,26 @@ class StockDataAgent:
             warnings.append("Extended company details are temporarily unavailable.")
             info = {}
 
+        latest_price = self._first_finite_number(
+            latest_price,
+            info.get("currentPrice"),
+            info.get("regularMarketPrice"),
+        )
+        previous_close = self._first_finite_number(
+            previous_close,
+            info.get("previousClose"),
+            info.get("regularMarketPreviousClose"),
+        )
+
         market_metadata = get_market_metadata(ticker, info)
         stock_data = {
             "ticker": ticker,
-            "company_name": info.get("longName") or info.get("shortName") or "N/A",
+            "company_name": (
+                info.get("longName")
+                or info.get("shortName")
+                or self._get_known_company_name(ticker)
+                or "N/A"
+            ),
             "current_price": latest_price,
             "previous_close": previous_close,
             "price_change": self._calculate_price_change(
@@ -131,6 +152,11 @@ class StockDataAgent:
         return stock_data
 
     def get_stock_history(self, ticker: str, period: str = "6mo"):
+        chart_history = self._get_chart_history(ticker, period)
+
+        if chart_history:
+            return chart_history
+
         stock = yf.Ticker(ticker)
         history = self._safe_call(
             lambda: stock.history(period=period, timeout=self.HISTORY_TIMEOUT_SECONDS),
@@ -212,6 +238,104 @@ class StockDataAgent:
             "previous_close": self._round_price(previous_close),
         }
 
+    def _get_chart_history(self, ticker: str, period: str):
+        chart = self._get_chart_result(ticker, period)
+
+        if not chart:
+            return []
+
+        timestamps = chart.get("timestamp") or []
+        quotes = (chart.get("indicators") or {}).get("quote") or []
+        quote_data = quotes[0] if quotes else {}
+        history = []
+
+        for index, timestamp in enumerate(timestamps):
+            close = self._chart_value(quote_data, "close", index)
+
+            if self._round_price(close) is None:
+                continue
+
+            history.append(
+                {
+                    "date": datetime.fromtimestamp(
+                        timestamp,
+                        tz=timezone.utc,
+                    ).strftime("%Y-%m-%d"),
+                    "open": self._round_price(
+                        self._chart_value(quote_data, "open", index)
+                    ),
+                    "high": self._round_price(
+                        self._chart_value(quote_data, "high", index)
+                    ),
+                    "low": self._round_price(
+                        self._chart_value(quote_data, "low", index)
+                    ),
+                    "close": self._round_price(close),
+                    "volume": self._safe_int(
+                        self._chart_value(quote_data, "volume", index)
+                    ),
+                }
+            )
+
+        return history
+
+    def _get_chart_result(self, ticker: str, period: str):
+        def fetch_chart():
+            last_error = None
+            encoded_ticker = quote(ticker, safe="")
+
+            for host in (
+                "query1.finance.yahoo.com",
+                "query2.finance.yahoo.com",
+                "query1.finance.yahoo.com",
+            ):
+                try:
+                    response = requests.get(
+                        f"https://{host}/v8/finance/chart/{encoded_ticker}",
+                        params={
+                            "range": period or "6mo",
+                            "interval": "1d",
+                            "events": "div,splits",
+                        },
+                        headers={"User-Agent": "Mozilla/5.0"},
+                        timeout=3,
+                    )
+                    response.raise_for_status()
+                    payload = response.json().get("chart") or {}
+
+                    if payload.get("error"):
+                        return None
+
+                    results = payload.get("result") or []
+                    return results[0] if results else None
+                except (requests.RequestException, ValueError) as error:
+                    last_error = error
+
+            if last_error:
+                raise last_error
+
+            return None
+
+        return self._safe_call(
+            fetch_chart,
+            timeout_seconds=self.HISTORY_TIMEOUT_SECONDS + 2,
+            label=f"chart:{period}",
+            ticker=ticker,
+        )
+
+    def _chart_value(self, quote_data, field: str, index: int):
+        values = quote_data.get(field) or []
+        return values[index] if index < len(values) else None
+
+    def _get_known_company_name(self, ticker: str):
+        normalized_ticker = ticker.strip().upper() if ticker else ""
+
+        for company in TickerResolverAgent.COMPANY_CATALOG:
+            if company["ticker"] == normalized_ticker:
+                return company["name"]
+
+        return None
+
     def _safe_call(self, callback, timeout_seconds: int, label: str, ticker: str):
         executor = ThreadPoolExecutor(max_workers=1)
         future = executor.submit(callback)
@@ -227,11 +351,10 @@ class StockDataAgent:
             )
         except Exception as error:
             logger.warning(
-                "yfinance %s failed for %s: %s",
+                "yfinance %s unavailable for %s (%s)",
                 label,
                 ticker,
-                error,
-                exc_info=True,
+                type(error).__name__,
             )
         finally:
             executor.shutdown(wait=False, cancel_futures=True)

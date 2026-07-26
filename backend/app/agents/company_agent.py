@@ -4,10 +4,12 @@ from concurrent.futures import ThreadPoolExecutor, TimeoutError
 
 import yfinance as yf
 
+from app.agents.ticker_resolver_agent import TickerResolverAgent
 from app.utils.market_utils import get_market_metadata, normalize_ticker
 
 
 logger = logging.getLogger(__name__)
+logging.getLogger("yfinance").setLevel(logging.CRITICAL)
 
 
 class CompanyAgent:
@@ -88,7 +90,9 @@ class CompanyAgent:
             info = {}
 
         metadata = get_market_metadata(ticker, info)
-        long_name = self._clean_value(info.get("longName"))
+        long_name = self._clean_value(info.get("longName")) or self._get_known_company_name(
+            ticker
+        )
         short_name = self._clean_value(info.get("shortName"))
         business_summary = self._clean_value(info.get("longBusinessSummary"))
 
@@ -178,11 +182,10 @@ class CompanyAgent:
             )
         except Exception as error:
             logger.warning(
-                "yfinance %s failed for %s: %s",
+                "yfinance %s unavailable for %s (%s)",
                 label,
                 ticker,
-                error,
-                exc_info=True,
+                type(error).__name__,
             )
         finally:
             executor.shutdown(wait=False, cancel_futures=True)
@@ -196,6 +199,13 @@ class CompanyAgent:
 
     def _normalize_ticker(self, ticker: str):
         return normalize_ticker(ticker)
+
+    def _get_known_company_name(self, ticker: str):
+        for company in TickerResolverAgent.COMPANY_CATALOG:
+            if company["ticker"] == ticker:
+                return company["name"]
+
+        return None
 
     def _clean_value(self, value):
         if isinstance(value, float) and not math.isfinite(value):

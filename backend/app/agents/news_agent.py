@@ -1,4 +1,5 @@
 import os
+from datetime import datetime, timezone
 from pathlib import Path
 
 import requests
@@ -18,10 +19,7 @@ class NewsAgent:
         api_key = os.getenv("NEWS_API_KEY")
 
         if not api_key:
-            return {
-                "articles": [],
-                "warning": "NEWS_API_KEY is not configured. News data is unavailable.",
-            }
+            return self._get_yahoo_news(query, page_size)
 
         try:
             response = requests.get(
@@ -37,12 +35,12 @@ class NewsAgent:
             )
             response.raise_for_status()
         except requests.RequestException:
-            return {
-                "articles": [],
-                "warning": "NewsAPI is temporarily unavailable.",
-            }
+            return self._get_yahoo_news(query, page_size)
 
         articles = response.json().get("articles", [])
+
+        if not articles:
+            return self._get_yahoo_news(query, page_size)
 
         return {
             "articles": [
@@ -57,3 +55,49 @@ class NewsAgent:
             ],
             "warning": None,
         }
+
+    def _get_yahoo_news(self, query: str, page_size: int):
+        try:
+            response = requests.get(
+                "https://query1.finance.yahoo.com/v1/finance/search",
+                params={
+                    "q": query,
+                    "quotesCount": 0,
+                    "newsCount": page_size,
+                },
+                headers={"User-Agent": "Mozilla/5.0"},
+                timeout=10,
+            )
+            response.raise_for_status()
+            articles = response.json().get("news") or []
+        except (requests.RequestException, ValueError):
+            return {
+                "articles": [],
+                "warning": "News providers are temporarily unavailable.",
+            }
+
+        return {
+            "articles": [
+                {
+                    "title": article.get("title"),
+                    "source": article.get("publisher"),
+                    "url": article.get("link"),
+                    "published_at": self._format_timestamp(
+                        article.get("providerPublishTime")
+                    ),
+                    "description": article.get("summary"),
+                }
+                for article in articles[:page_size]
+                if article.get("title") and article.get("link")
+            ],
+            "warning": None,
+        }
+
+    def _format_timestamp(self, timestamp):
+        try:
+            return datetime.fromtimestamp(
+                int(timestamp),
+                tz=timezone.utc,
+            ).isoformat()
+        except (TypeError, ValueError, OSError):
+            return None

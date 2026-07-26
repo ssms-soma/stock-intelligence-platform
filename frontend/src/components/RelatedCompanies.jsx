@@ -42,6 +42,10 @@ function getLocalRelatedTickers(ticker) {
 }
 
 function formatTrendValue(value) {
+  if (value === null || value === undefined || value === "") {
+    return "N/A";
+  }
+
   const numberValue = Number(value);
 
   if (!Number.isFinite(numberValue)) {
@@ -54,6 +58,10 @@ function formatTrendValue(value) {
 function formatTrendText(trend) {
   if (
     !trend ||
+    trend.change === null ||
+    trend.change === undefined ||
+    trend.changePercent === null ||
+    trend.changePercent === undefined ||
     !Number.isFinite(Number(trend.change)) ||
     !Number.isFinite(Number(trend.changePercent))
   ) {
@@ -78,8 +86,20 @@ function TrendMarker({ direction }) {
 }
 
 function getStockTrend(stock) {
-  const change = Number(stock?.price_change);
-  const changePercent = Number(stock?.price_change_percent);
+  const rawChange = stock?.price_change;
+  const rawChangePercent = stock?.price_change_percent;
+
+  if (
+    rawChange === null ||
+    rawChange === undefined ||
+    rawChangePercent === null ||
+    rawChangePercent === undefined
+  ) {
+    return null;
+  }
+
+  const change = Number(rawChange);
+  const changePercent = Number(rawChangePercent);
 
   if (!Number.isFinite(change) || !Number.isFinite(changePercent)) {
     return null;

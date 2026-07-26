@@ -73,6 +73,11 @@ class Settings(BaseModel):
         "DOCUMENT_INDEX_MAX_DOCUMENTS",
         25,
     )
+    pdf_max_pages: int = _get_positive_int("PDF_MAX_PAGES", 100)
+    pdf_min_extracted_chars: int = _get_positive_int(
+        "PDF_MIN_EXTRACTED_CHARS",
+        100,
+    )
 
 
 settings = Settings()
