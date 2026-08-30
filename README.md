@@ -214,17 +214,24 @@ POST /api/documents/{document_id}/ask
 
 ## Backend
 
+The supported backend runtime is Python 3.12.
+
 Go to the backend folder:
 
 ```powershell
 cd backend
 ```
 
-Create and activate a virtual environment if needed, then install dependencies:
+Create a Python 3.12 virtual environment, activate it, and install dependencies:
 
 ```powershell
-.\.venv\Scripts\python.exe -m pip install -r requirements.txt
+py -3.12 -m venv .venv
+.\.venv\Scripts\activate
+python -m pip install -r requirements.txt
 ```
+
+If the Windows Python launcher does not detect installed interpreters, invoke
+the Python 3.12 executable by its full path for the `-m venv .venv` command.
 
 Create a `.env` file in the backend folder.
 
@@ -254,9 +261,11 @@ DOCUMENT_TEXT_MAX_CHARS=100000
 DOCUMENT_INDEX_MAX_DOCUMENTS=25
 ```
 
-Install Ollama models:
+Start Ollama and install the required local models if they are not already
+available:
 
 ```powershell
+ollama serve
 ollama pull llama3.1:8b
 ollama pull nomic-embed-text
 ollama list
@@ -265,7 +274,7 @@ ollama list
 Run the backend:
 
 ```powershell
-.\.venv\Scripts\python.exe -m uvicorn app.main:app --reload
+python -m uvicorn app.main:app --reload
 ```
 
 Backend runs at:
@@ -306,7 +315,8 @@ Backend tests:
 
 ```powershell
 cd backend
-.\.venv\Scripts\python.exe -m unittest discover -s tests -p "test_*.py" -v
+python -m unittest discover -s tests -p "test_*.py" -v
+python mvp_smoke.py
 ```
 
 Frontend build:
