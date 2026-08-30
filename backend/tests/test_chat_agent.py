@@ -64,6 +64,70 @@ class ChatAgentTests(unittest.TestCase):
 
         self.assertEqual(context, {})
 
+    def test_selects_question_aware_company_context(self):
+        self.assertEqual(
+            self.agent.select_context_sources("What does Apple do?"),
+            ["company_profile"],
+        )
+        self.assertEqual(
+            self.agent.select_context_sources(
+                "How has Apple stock performed recently?"
+            ),
+            ["stock_metrics", "price_history"],
+        )
+        self.assertEqual(
+            self.agent.select_context_sources("What is the latest Apple news?"),
+            ["company_profile", "news"],
+        )
+        self.assertEqual(
+            self.agent.select_context_sources(
+                "What recent news should investors care about?"
+            ),
+            ["company_profile", "news"],
+        )
+        self.assertEqual(
+            self.agent.select_context_sources(
+                "What risks should an investor watch?"
+            ),
+            ["company_profile", "news", "research"],
+        )
+        self.assertEqual(
+            self.agent.select_context_sources("Should I buy Apple?"),
+            list(self.agent.CONTEXT_SOURCES),
+        )
+
+    def test_summarizes_price_history_safely(self):
+        summary = self.agent.summarize_price_history(
+            [
+                {"close": 100},
+                {"close": None},
+                {"close": 110},
+                {"close": 105},
+            ],
+            period="1mo",
+        )
+
+        self.assertEqual(
+            summary,
+            {
+                "period": "1mo",
+                "data_points": 3,
+                "start_price": 100.0,
+                "end_price": 105.0,
+                "absolute_move": 5.0,
+                "percentage_move": 5.0,
+                "highest_close": 110.0,
+                "lowest_close": 100.0,
+                "trend": "UP",
+            },
+        )
+        self.assertEqual(self.agent.summarize_price_history([]), {})
+        self.assertIsNone(
+            self.agent.summarize_price_history(
+                [{"close": 0}, {"close": 2}]
+            )["percentage_move"]
+        )
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -1,14 +1,16 @@
 import time
 
 from app.agents.company_agent import CompanyAgent
+from app.services.stock_service import StockService
 
 
 COMPANY_PROFILE_TTL_SECONDS = 20 * 60
 
 
 class CompanyService:
-    def __init__(self):
-        self.company_agent = CompanyAgent()
+    def __init__(self, company_agent=None, stock_service=None):
+        self.company_agent = company_agent or CompanyAgent()
+        self.stock_service = stock_service or StockService()
         self._company_cache = {}
 
     def get_company_profile(self, ticker: str):
@@ -23,6 +25,11 @@ class CompanyService:
             return cached
 
         company_profile = self.company_agent.get_company_profile(normalized_ticker)
+        if not self._has_usable_company_profile(company_profile):
+            company_profile = self._enrich_from_stock(
+                company_profile,
+                normalized_ticker,
+            )
         if self._has_usable_company_profile(company_profile):
             self._set_cached(
                 self._company_cache,
@@ -31,6 +38,35 @@ class CompanyService:
                 COMPANY_PROFILE_TTL_SECONDS,
             )
         return company_profile
+
+    def _enrich_from_stock(self, company_response, ticker):
+        response = dict(company_response) if isinstance(company_response, dict) else {}
+        profile = dict(response.get("company_profile") or {})
+
+        try:
+            stock_data = self.stock_service.get_stock_data(ticker)
+        except Exception:
+            stock_data = {}
+
+        mappings = {
+            "name": "company_name",
+            "long_name": "company_name",
+            "sector": "sector",
+            "market": "market",
+            "country": "country",
+            "exchange": "exchange",
+            "currency": "currency",
+            "currency_symbol": "currency_symbol",
+        }
+        for profile_field, stock_field in mappings.items():
+            value = stock_data.get(stock_field) if isinstance(stock_data, dict) else None
+            if not profile.get(profile_field) and value not in (None, "", "N/A"):
+                profile[profile_field] = value
+
+        profile.setdefault("ticker", ticker)
+        response["ticker"] = ticker
+        response["company_profile"] = profile
+        return response
 
     def _get_cached(self, cache, key):
         entry = cache.get(key)

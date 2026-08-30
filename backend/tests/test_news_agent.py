@@ -37,13 +37,81 @@ class NewsAgentTests(unittest.TestCase):
         mock_get.side_effect = [
             requests.ConnectionError("unavailable"),
             yahoo_response,
+            requests.ConnectionError("unavailable"),
+            yahoo_response,
         ]
 
         result = NewsAgent().get_stock_news("stock market", 5)
 
         self.assertEqual(result["articles"], [])
-        self.assertIsNone(result["warning"])
-        self.assertEqual(mock_get.call_count, 2)
+        self.assertIn("Relevant news", result["warning"])
+        self.assertEqual(mock_get.call_count, 4)
+
+    def test_rejects_unrelated_apple_football_news(self):
+        agent = NewsAgent()
+        articles = [
+            {
+                "title": "Longview prepares for Apple Springs football game",
+                "description": "The Tigers open their high-school season Friday.",
+                "url": "https://example.test/sports",
+            }
+        ]
+
+        self.assertEqual(
+            agent._filter_relevant_articles(articles, "Apple Inc."),
+            [],
+        )
+
+    def test_retains_genuine_apple_article(self):
+        agent = NewsAgent()
+        article = {
+            "title": "Apple announces new iPhone manufacturing investment",
+            "description": "Apple Inc. outlined its latest product plans.",
+            "url": "https://example.test/apple",
+        }
+
+        self.assertEqual(
+            agent._filter_relevant_articles([article], "Apple Inc."),
+            [article],
+        )
+
+    @patch.dict("os.environ", {"NEWS_API_KEY": "test"}, clear=True)
+    def test_general_market_query_uses_bounded_fallback(self):
+        agent = NewsAgent()
+        empty = {"articles": [], "warning": None}
+        market_article = {
+            "title": "Financial markets rise after inflation report",
+            "description": "Stocks and bonds advanced.",
+            "url": "https://example.test/markets",
+        }
+        with patch.object(
+            agent,
+            "_get_news_api_news",
+            side_effect=[empty, empty],
+        ), patch.object(
+            agent,
+            "_get_yahoo_news",
+            side_effect=[empty, {"articles": [market_article], "warning": None}],
+        ):
+            result = agent.get_stock_news("stock market", 5)
+
+        self.assertEqual(result["articles"], [market_article])
+
+    @patch.dict("os.environ", {"NEWS_API_KEY": "test"}, clear=True)
+    def test_unavailable_or_irrelevant_providers_return_safe_empty_list(self):
+        agent = NewsAgent()
+        irrelevant = {
+            "articles": [{"title": "Tigers win football opener"}],
+            "warning": None,
+        }
+        unavailable = {"articles": [], "warning": "unavailable"}
+        with patch.object(agent, "_get_news_api_news", return_value=irrelevant), patch.object(
+            agent, "_get_yahoo_news", return_value=unavailable
+        ):
+            result = agent.get_stock_news("Apple Inc.", 5)
+
+        self.assertEqual(result["articles"], [])
+        self.assertIn("Relevant news", result["warning"])
 
 
 if __name__ == "__main__":

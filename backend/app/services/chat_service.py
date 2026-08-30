@@ -1,7 +1,11 @@
 from app.agents.chat_agent import ChatAgent
 from app.agents.llm_agent import LLMAgent
 from app.services.company_service import CompanyService
+from app.services.news_service import NewsService
 from app.services.rag_service import RAGService
+from app.services.recommendation_service import RecommendationService
+from app.services.research_service import ResearchService
+from app.services.stock_service import StockService
 
 
 class ChatService:
@@ -11,11 +15,21 @@ class ChatService:
         llm_agent=None,
         rag_service=None,
         company_service=None,
+        stock_service=None,
+        news_service=None,
+        research_service=None,
+        recommendation_service=None,
     ):
         self.chat_agent = chat_agent or ChatAgent()
         self.llm_agent = llm_agent or LLMAgent()
         self.rag_service = rag_service or RAGService()
         self.company_service = company_service or CompanyService()
+        self.stock_service = stock_service or StockService()
+        self.news_service = news_service or NewsService()
+        self.research_service = research_service or ResearchService()
+        self.recommendation_service = (
+            recommendation_service or RecommendationService()
+        )
 
     def chat(
         self,
@@ -74,6 +88,10 @@ class ChatService:
         ticker,
         mode,
         company_context=None,
+        grounded_context=None,
+        requested_sources=None,
+        sources_used=None,
+        context_status=None,
         existing_warning=None,
     ):
         llm_result = self.llm_agent.answer_question(
@@ -81,6 +99,9 @@ class ChatService:
             context=self.chat_agent.build_llm_context(
                 mode=mode,
                 company_context=company_context,
+                grounded_context=grounded_context,
+                warnings=self._warning_list(existing_warning),
+                requested_sources=requested_sources,
             ),
         )
         llm_warning = llm_result.get("warning")
@@ -91,31 +112,97 @@ class ChatService:
             ticker=ticker,
             model=llm_result.get("model"),
             used_company_context=bool(company_context),
+            sources_requested=requested_sources,
+            sources_used=sources_used,
+            context_status=context_status,
             warning=self._join_warnings(existing_warning, llm_warning),
         )
 
     def _company_chat(self, message, ticker):
-        company_result = None
-        lookup_warning = None
+        requested_sources = self.chat_agent.select_context_sources(message)
+        grounded_context = {}
+        context_status = {}
+        sources_used = []
+        warnings = []
 
-        try:
-            company_result = self.company_service.get_company_profile(ticker)
-            if isinstance(company_result, dict):
-                lookup_warning = company_result.get("warning")
-        except Exception:
-            lookup_warning = "Company context is temporarily unavailable."
+        for source in requested_sources:
+            context_value, source_warning = self._collect_context_source(
+                source,
+                ticker,
+                grounded_context,
+            )
+            if context_value:
+                grounded_context[source] = context_value
+                sources_used.append(source)
+                context_status[source] = (
+                    "degraded" if source_warning else "available"
+                )
+            else:
+                context_status[source] = "unavailable"
 
-        company_context = self.chat_agent.build_company_context(company_result)
-        if not company_context and not lookup_warning:
-            lookup_warning = "Company context is unavailable for this ticker."
+            if source_warning:
+                warnings.append(f"{self._source_label(source)}: {source_warning}")
+            elif not context_value:
+                warnings.append(
+                    f"{self._source_label(source)} is temporarily unavailable."
+                )
+
+        company_context = grounded_context.pop("company_profile", None)
 
         return self._llm_chat(
             message=message,
             ticker=ticker,
             mode="company",
             company_context=company_context,
-            existing_warning=lookup_warning,
+            grounded_context=grounded_context,
+            requested_sources=requested_sources,
+            sources_used=sources_used,
+            context_status=context_status,
+            existing_warning=self._join_warnings(*warnings),
         )
+
+    def _collect_context_source(self, source, ticker, collected_context):
+        try:
+            if source == "company_profile":
+                result = self.company_service.get_company_profile(ticker)
+                warning = result.get("warning") if isinstance(result, dict) else None
+                return self.chat_agent.build_company_context(result), warning
+
+            if source == "stock_metrics":
+                result = self.stock_service.get_stock_data(ticker)
+                warning = result.get("warning") if isinstance(result, dict) else None
+                return self.chat_agent.build_market_context(result), warning
+
+            if source == "price_history":
+                period = "1mo"
+                result = self.stock_service.get_stock_history(ticker, period=period)
+                return self.chat_agent.summarize_price_history(result, period), None
+
+            if source == "news":
+                company = collected_context.get("company_profile") or {}
+                query = company.get("name") or ticker
+                result = self.news_service.get_stock_news(query, page_size=3)
+                return (
+                    self.chat_agent.build_news_context(result),
+                    self.news_service.last_warning,
+                )
+
+            if source == "research":
+                result = self.research_service.get_research_report(ticker)
+                warnings = result.get("warnings") if isinstance(result, dict) else None
+                return (
+                    self.chat_agent.build_research_context(result),
+                    self._join_warnings(warnings),
+                )
+
+            if source == "recommendations":
+                result = self.recommendation_service.get_recommendations(ticker)
+                warning = result.get("warning") if isinstance(result, dict) else None
+                return self.chat_agent.build_recommendation_context(result), warning
+        except Exception:
+            return {}, "The provider request failed."
+
+        return {}, "The context source is unsupported."
 
     def _rag_chat(self, message, ticker, documents, top_k):
         rag_result = self.rag_service.test_rag(
@@ -152,6 +239,9 @@ class ChatService:
         model=None,
         used_rag=False,
         used_company_context=False,
+        sources_requested=None,
+        sources_used=None,
+        context_status=None,
         warning=None,
         extra_metadata=None,
     ):
@@ -160,6 +250,9 @@ class ChatService:
             "used_rag": used_rag,
             "used_company_context": used_company_context,
             "single_turn": True,
+            "sources_requested": sources_requested or [],
+            "sources_used": sources_used or [],
+            "context_status": context_status or {},
         }
         if extra_metadata:
             metadata.update(
@@ -183,6 +276,16 @@ class ChatService:
     def _join_warnings(*warnings):
         unique_warnings = []
         for warning in warnings:
-            if warning and warning not in unique_warnings:
-                unique_warnings.append(str(warning))
+            values = warning if isinstance(warning, list) else [warning]
+            for value in values:
+                if value and value not in unique_warnings:
+                    unique_warnings.append(str(value))
         return " ".join(unique_warnings) or None
+
+    @staticmethod
+    def _warning_list(warning):
+        return [warning] if warning else []
+
+    @staticmethod
+    def _source_label(source):
+        return source.replace("_", " ").capitalize()

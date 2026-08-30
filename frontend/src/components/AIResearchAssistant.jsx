@@ -8,10 +8,20 @@ import {
 
 const QUICK_PROMPTS = [
   "What does this company do?",
-  "Explain simply",
-  "Main business areas",
-  "What should I know?",
+  "How has the stock performed recently?",
+  "What are the main risks?",
+  "What recent news matters?",
+  "What should investors watch?",
 ];
+
+const CONTEXT_LABELS = {
+  company_profile: "Company profile",
+  stock_metrics: "Market metrics",
+  price_history: "Price history",
+  news: "Recent news",
+  research: "Research signals",
+  recommendations: "Recommendation signals",
+};
 
 function devWarn(...args) {
   if (import.meta.env.DEV) {
@@ -256,9 +266,18 @@ function AIResearchAssistant({ ticker }) {
           title: uploadedDocument?.title || "",
         });
       } else {
+        const contextStatus =
+          response?.metadata?.context_status &&
+          typeof response.metadata.context_status === "object"
+            ? response.metadata.context_status
+            : {};
         setResponseDetails({
           mode: response?.mode || "",
           ticker: response?.ticker || ticker,
+          sourcesUsed: Array.isArray(response?.metadata?.sources_used)
+            ? response.metadata.sources_used
+            : [],
+          contextStatus,
         });
       }
     } catch (requestError) {
@@ -488,6 +507,45 @@ function AIResearchAssistant({ ticker }) {
                 </ul>
               </div>
             )}
+
+            {!loading &&
+              responseDetails?.mode === "company" &&
+              Object.keys(responseDetails.contextStatus || {}).length > 0 && (
+                <div className="ai-assistant-context-used">
+                  <p className="ai-assistant-question-label">Context used</p>
+                  <ul>
+                    {Object.entries(responseDetails.contextStatus).map(
+                      ([source, status]) => {
+                        const wasUsed = responseDetails.sourcesUsed?.includes(source);
+                        const unavailable = status === "unavailable";
+                        const degraded = status === "degraded";
+                        return (
+                          <li
+                            key={source}
+                            className={
+                              unavailable || degraded ? "is-degraded" : ""
+                            }
+                          >
+                            <span aria-hidden="true">
+                              {unavailable || degraded ? "⚠" : "✓"}
+                            </span>
+                            <span>{CONTEXT_LABELS[source] || source}</span>
+                            <span>
+                              {unavailable
+                                ? "Unavailable"
+                                : degraded
+                                  ? "Partial"
+                                  : wasUsed
+                                    ? "Available"
+                                    : "Not used"}
+                            </span>
+                          </li>
+                        );
+                      }
+                    )}
+                  </ul>
+                </div>
+              )}
 
             {!loading && responseDetails && (
               <div className="ai-assistant-metadata">

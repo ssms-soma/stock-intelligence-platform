@@ -74,7 +74,9 @@ function MarketHeadlines() {
       )}
 
       {!loading && !failed && headlines.length === 0 && (
-        <p style={{ color: "#64748b" }}>No market headlines found.</p>
+        <p style={{ color: "#64748b" }}>
+          Latest market news is temporarily unavailable.
+        </p>
       )}
 
       {!loading && !failed && headlines.length > 0 && (

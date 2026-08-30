@@ -710,6 +710,45 @@ p {
   font-weight: 800;
 }
 
+.ai-assistant-context-used {
+  margin-top: 1rem;
+  border-top: 1px solid #dbe3ef;
+  padding-top: 0.85rem;
+}
+
+.ai-assistant-context-used ul {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.ai-assistant-context-used li {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  border: 1px solid #bbf7d0;
+  border-radius: 999px;
+  background: #f0fdf4;
+  padding: 0.38rem 0.6rem;
+  color: #166534;
+  font-size: 0.78rem;
+  font-weight: 700;
+}
+
+.ai-assistant-context-used li span:last-child {
+  color: #64748b;
+  font-weight: 600;
+}
+
+.ai-assistant-context-used li.is-degraded {
+  border-color: #fde68a;
+  background: #fffbeb;
+  color: #92400e;
+}
+
 .price-target-strip {
   display: flex;
   align-items: center;

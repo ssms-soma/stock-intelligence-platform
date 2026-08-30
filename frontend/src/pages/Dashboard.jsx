@@ -45,6 +45,8 @@ function Dashboard() {
   const [companyLoading, setCompanyLoading] = useState(false);
   const [companyError, setCompanyError] = useState("");
   const [newsData, setNewsData] = useState([]);
+  const [newsLoading, setNewsLoading] = useState(false);
+  const [newsError, setNewsError] = useState("");
   const [researchData, setResearchData] = useState(null);
   const [researchLoading, setResearchLoading] = useState(false);
   const [researchError, setResearchError] = useState("");
@@ -59,6 +61,7 @@ function Dashboard() {
   const [searching, setSearching] = useState(false);
   const requestSequenceRef = useRef(0);
   const historySequenceRef = useRef(0);
+  const currentTickerRef = useRef("");
   const isStockDetailView = Boolean(routeTicker);
 
   useEffect(() => {
@@ -170,6 +173,8 @@ function Dashboard() {
 
     const requestId = requestSequenceRef.current + 1;
     requestSequenceRef.current = requestId;
+    currentTickerRef.current = trimmedTicker.toUpperCase();
+    historySequenceRef.current += 1;
 
     setLoading(true);
     setStockLoading(true);
@@ -185,6 +190,8 @@ function Dashboard() {
     setCompanyError("");
     setCompanyLoading(true);
     setNewsData([]);
+    setNewsLoading(true);
+    setNewsError("");
     setResearchData(null);
     setResearchError("");
     setResearchRequestId((currentId) => currentId + 1);
@@ -214,54 +221,52 @@ function Dashboard() {
         }
       });
 
-    const [stockResult, historyResult] = await Promise.allSettled([
-      fetchStockMetrics(trimmedTicker),
-      fetchStockHistory(trimmedTicker, period),
-    ]);
+    const stockTask = fetchStockMetrics(trimmedTicker)
+      .then((value) => ({ status: "fulfilled", value }))
+      .catch((reason) => ({ status: "rejected", reason }));
+    const historyTask = fetchStockHistory(trimmedTicker, period)
+      .then((value) => ({ status: "fulfilled", value }))
+      .catch((reason) => ({ status: "rejected", reason }));
 
-    if (requestSequenceRef.current !== requestId) {
-      return;
-    }
-
-    devLog("ticker:", trimmedTicker);
-    devLog("stock API status:", stockResult.status);
-
-    let newsQuery = trimmedTicker;
-
-    if (stockResult.status === "fulfilled") {
-      const data = stockResult.value && typeof stockResult.value === "object"
-        ? stockResult.value
-        : null;
-      setStockData(data);
-
-      if (!data) {
+    const stockResult = await stockTask;
+    if (requestSequenceRef.current === requestId) {
+      if (stockResult.status === "fulfilled") {
+        const data = stockResult.value && typeof stockResult.value === "object"
+          ? stockResult.value
+          : null;
+        setStockData(data);
+        if (!data) setStockError("Stock metrics are temporarily unavailable.");
+      } else {
+        devWarn("failed API name:", "stock metrics", stockResult.reason);
         setStockError("Stock metrics are temporarily unavailable.");
       }
-
-      newsQuery = data?.company_name && data.company_name !== "N/A"
-        ? data.company_name
-        : trimmedTicker;
-    } else {
-      devWarn("failed API name:", "stock metrics", stockResult.reason);
-      setStockError("Stock metrics are temporarily unavailable.");
+      setStockLoading(false);
     }
 
-    if (historyResult.status === "fulfilled") {
-      const history = Array.isArray(historyResult.value) ? historyResult.value : [];
-      setHistoryData(history);
-      devLog("history length:", history.length);
-      devLog("first history row:", history[0]);
-    } else {
-      devWarn("failed API name:", "stock history", historyResult.reason);
-      setHistoryError("Price history is temporarily unavailable.");
-      setHistoryData([]);
+    const newsQuery = stockResult.status === "fulfilled" &&
+      stockResult.value?.company_name && stockResult.value.company_name !== "N/A"
+      ? stockResult.value.company_name
+      : trimmedTicker;
+    const newsTask = fetchCompanyNews(newsQuery)
+      .then((value) => ({ status: "fulfilled", value }))
+      .catch((reason) => ({ status: "rejected", reason }));
+
+    const historyResult = await historyTask;
+    if (requestSequenceRef.current === requestId) {
+      if (historyResult.status === "fulfilled") {
+        setHistoryData(Array.isArray(historyResult.value) ? historyResult.value : []);
+      } else {
+        devWarn("failed API name:", "stock history", historyResult.reason);
+        setHistoryError("Price history is temporarily unavailable.");
+        setHistoryData([]);
+      }
+      setHistoryLoading(false);
     }
 
-    setStockLoading(false);
-    setHistoryLoading(false);
-
+    const newsResult = await newsTask;
     try {
-      const news = await fetchCompanyNews(newsQuery);
+      if (newsResult.status === "rejected") throw newsResult.reason;
+      const news = newsResult.value;
 
       if (requestSequenceRef.current !== requestId) {
         return;
@@ -276,8 +281,10 @@ function Dashboard() {
 
       devWarn("failed API name:", "company news", newsError);
       setNewsData([]);
+      setNewsError("Recent company news is temporarily unavailable.");
     } finally {
       if (requestSequenceRef.current === requestId) {
+        setNewsLoading(false);
         setLoading(false);
       }
     }
@@ -315,11 +322,15 @@ function Dashboard() {
     setHistoryError("");
     const historyRequestId = historySequenceRef.current + 1;
     historySequenceRef.current = historyRequestId;
+    const requestedTicker = selectedTicker.toUpperCase();
 
     try {
       const history = await fetchStockHistory(selectedTicker, period);
 
-      if (historySequenceRef.current !== historyRequestId) {
+      if (
+        historySequenceRef.current !== historyRequestId ||
+        currentTickerRef.current !== requestedTicker
+      ) {
         return;
       }
 
@@ -329,7 +340,10 @@ function Dashboard() {
       devLog("history length:", safeHistory.length);
       devLog("first history row:", safeHistory[0]);
     } catch (err) {
-      if (historySequenceRef.current !== historyRequestId) {
+      if (
+        historySequenceRef.current !== historyRequestId ||
+        currentTickerRef.current !== requestedTicker
+      ) {
         return;
       }
 
@@ -433,6 +447,7 @@ function Dashboard() {
 
           <CompanyProfileCard
             profile={companyData}
+            stockData={stockData}
             loading={companyLoading}
             error={companyError}
           />
@@ -476,14 +491,14 @@ function Dashboard() {
             <NewsSection newsData={newsData} />
           )}
 
-          {loading && newsData.length === 0 && <SkeletonNewsList />}
+          {newsLoading && newsData.length === 0 && <SkeletonNewsList />}
 
           {stockData &&
             Array.isArray(newsData) &&
             newsData.length === 0 &&
             !loading && (
               <p style={{ marginTop: "3rem" }}>
-                No news articles found for this stock.
+                {newsError || "Recent company news is temporarily unavailable."}
               </p>
             )}
         </main>
