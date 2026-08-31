@@ -41,6 +41,7 @@ def _get_positive_int(name: str, default: int):
 class Settings(BaseModel):
     app_name: str = "AI Stock Intelligence Platform"
     environment: str = os.getenv("ENVIRONMENT", "development")
+    database_url: str | None = os.getenv("DATABASE_URL")
     llm_provider: str = os.getenv("LLM_PROVIDER", "none")
     llm_api_key: str | None = os.getenv("LLM_API_KEY")
     llm_model: str = os.getenv("LLM_MODEL", "gpt-4o-mini")
