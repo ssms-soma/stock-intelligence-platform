@@ -42,6 +42,12 @@ class Settings(BaseModel):
     app_name: str = "AI Stock Intelligence Platform"
     environment: str = os.getenv("ENVIRONMENT", "development")
     database_url: str | None = os.getenv("DATABASE_URL")
+    jwt_secret_key: str | None = os.getenv("JWT_SECRET_KEY")
+    jwt_algorithm: str = os.getenv("JWT_ALGORITHM", "HS256")
+    jwt_access_token_expire_minutes: int = _get_positive_int(
+        "JWT_ACCESS_TOKEN_EXPIRE_MINUTES",
+        30,
+    )
     llm_provider: str = os.getenv("LLM_PROVIDER", "none")
     llm_api_key: str | None = os.getenv("LLM_API_KEY")
     llm_model: str = os.getenv("LLM_MODEL", "gpt-4o-mini")
