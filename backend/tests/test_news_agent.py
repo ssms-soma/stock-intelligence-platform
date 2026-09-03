@@ -75,6 +75,66 @@ class NewsAgentTests(unittest.TestCase):
             [article],
         )
 
+    def test_tcs_full_name_expands_to_common_aliases(self):
+        candidates = NewsAgent()._query_candidates(
+            "Tata Consultancy Services Limited"
+        )
+
+        self.assertIn("Tata Consultancy Services", candidates)
+        self.assertIn("TCS", candidates)
+
+    def test_tcs_short_name_article_is_relevant_to_full_name_query(self):
+        agent = NewsAgent()
+        article = {
+            "title": "TCS reports stronger quarterly revenue",
+            "description": "The technology company raised its outlook.",
+        }
+
+        self.assertEqual(
+            agent._filter_relevant_articles(
+                [article], "Tata Consultancy Services Limited"
+            ),
+            [article],
+        )
+
+    def test_wipro_full_name_expands_and_accepts_short_name_article(self):
+        agent = NewsAgent()
+        candidates = agent._query_candidates("Wipro Limited")
+        article = {
+            "title": "Wipro wins technology services contract",
+            "description": "The company announced the agreement Tuesday.",
+        }
+
+        self.assertIn("Wipro", candidates)
+        self.assertEqual(
+            agent._filter_relevant_articles([article], "Wipro Limited"),
+            [article],
+        )
+
+    @patch.dict("os.environ", {}, clear=True)
+    def test_alias_fallback_stops_after_relevant_news(self):
+        agent = NewsAgent()
+        empty = {"articles": [], "warning": None}
+        relevant = {
+            "articles": [
+                {
+                    "title": "TCS reports stronger quarterly revenue",
+                    "description": "The company raised its outlook.",
+                }
+            ],
+            "warning": None,
+        }
+
+        with patch.object(
+            agent, "_get_yahoo_news", side_effect=[empty, relevant]
+        ) as yahoo_news:
+            result = agent.get_stock_news(
+                "Tata Consultancy Services Limited", 5
+            )
+
+        self.assertEqual(result["articles"], relevant["articles"])
+        self.assertEqual(yahoo_news.call_count, 2)
+
     @patch.dict("os.environ", {"NEWS_API_KEY": "test"}, clear=True)
     def test_general_market_query_uses_bounded_fallback(self):
         agent = NewsAgent()

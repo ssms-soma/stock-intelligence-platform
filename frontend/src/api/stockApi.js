@@ -1,4 +1,4 @@
-import { getOrFetch } from "./apiCache";
+import { deleteCached, getOrFetch } from "./apiCache";
 
 const API_BASE_URL = "/api";
 const STOCK_METRICS_TTL_MS = 60 * 1000;
@@ -39,8 +39,9 @@ export async function fetchStockHistory(ticker, period = "6mo") {
     return [];
   }
 
-  return getOrFetch(
-    `history:${normalizedTicker}:${normalizedPeriod}`,
+  const cacheKey = `history:${normalizedTicker}:${normalizedPeriod}`;
+  const history = await getOrFetch(
+    cacheKey,
     async () => {
       const response = await fetch(
         `${API_BASE_URL}/stocks/${normalizedTicker}/history?period=${normalizedPeriod}`
@@ -57,4 +58,10 @@ export async function fetchStockHistory(ticker, period = "6mo") {
     },
     STOCK_HISTORY_TTL_MS
   );
+
+  if (!Array.isArray(history) || history.length === 0) {
+    deleteCached(cacheKey);
+  }
+
+  return Array.isArray(history) ? history : [];
 }

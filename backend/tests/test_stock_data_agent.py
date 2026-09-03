@@ -27,7 +27,7 @@ class FakeTicker:
         "volume": math.nan,
     }
 
-    def history(self, period, timeout):
+    def history(self, period, interval, timeout):
         return pd.DataFrame()
 
 
@@ -145,6 +145,7 @@ class StockDataAgentTests(unittest.TestCase):
         self.assertEqual(result[0]["close"], 104.0)
         self.assertEqual(result[0]["volume"], 1000)
         mock_download.assert_called_once()
+        self.assertEqual(mock_download.call_args.kwargs["interval"], "1d")
 
     @patch.object(
         StockDataAgent,
@@ -184,6 +185,48 @@ class StockDataAgentTests(unittest.TestCase):
         self.assertEqual(result["timestamp"], [1753401600])
         self.assertEqual(mock_get.call_count, 2)
         self.assertIn("query2.finance.yahoo.com", mock_get.call_args.args[0])
+
+    @patch("app.agents.stock_data_agent.requests.get")
+    def test_chart_request_uses_period_specific_interval(self, mock_get):
+        response = Mock()
+        response.json.return_value = {
+            "chart": {"result": [{"timestamp": []}], "error": None}
+        }
+        mock_get.return_value = response
+
+        StockDataAgent()._get_chart_result("TCS.NS", "1d")
+
+        self.assertEqual(mock_get.call_args.kwargs["params"]["interval"], "5m")
+
+    @patch.object(StockDataAgent, "_get_chart_result")
+    def test_intraday_history_preserves_distinct_timestamps(self, mock_chart):
+        mock_chart.return_value = {
+            "timestamp": [1753401600, 1753401900],
+            "indicators": {
+                "quote": [
+                    {
+                        "open": [100.0, 101.0],
+                        "high": [101.0, 102.0],
+                        "low": [99.0, 100.0],
+                        "close": [100.5, 101.5],
+                        "volume": [1000, 1200],
+                    }
+                ]
+            },
+        }
+
+        result = StockDataAgent()._get_chart_history("TCS.NS", "1d")
+
+        self.assertNotEqual(result[0]["date"], result[1]["date"])
+        self.assertIn("T", result[0]["date"])
+
+    def test_supported_period_interval_mapping(self):
+        agent = StockDataAgent()
+
+        self.assertEqual(agent._history_interval("1d"), "5m")
+        self.assertEqual(agent._history_interval("5d"), "1d")
+        self.assertEqual(agent._history_interval("1mo"), "1d")
+        self.assertEqual(agent._history_interval("6mo"), "1d")
 
 
 if __name__ == "__main__":

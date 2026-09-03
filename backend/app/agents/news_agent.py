@@ -6,6 +6,8 @@ from pathlib import Path
 import requests
 from dotenv import load_dotenv
 
+from app.agents.ticker_resolver_agent import TickerResolverAgent
+
 
 BACKEND_ENV_PATH = Path(__file__).resolve().parents[2] / ".env"
 load_dotenv(BACKEND_ENV_PATH)
@@ -79,7 +81,22 @@ class NewsAgent:
         normalized = self._normalize(query)
         if normalized in {"stock market", "financial markets", "markets", "business"}:
             return [query, "financial markets"] if normalized != "financial markets" else [query]
-        return [query]
+
+        company = self._known_company(normalized)
+        if not company:
+            return [query]
+
+        candidates = [query, company["name"], *company.get("aliases", ())]
+        unique_candidates = []
+        seen = set()
+
+        for candidate in candidates:
+            normalized_candidate = self._normalize(candidate)
+            if normalized_candidate and normalized_candidate not in seen:
+                seen.add(normalized_candidate)
+                unique_candidates.append(candidate)
+
+        return unique_candidates[:5]
 
     def _filter_relevant_articles(self, articles, original_query):
         return [
@@ -128,8 +145,34 @@ class NewsAgent:
             "reliance industries limited": ({"reliance industries", "reliance ns"}, {"reliance"}),
             "reliance ns": ({"reliance industries", "reliance ns"}, {"reliance"}),
         }
-        strong, ambiguous = aliases.get(query, ({query}, set()))
+        if query in aliases:
+            strong, ambiguous = aliases[query]
+            return {"strong": strong, "ambiguous": ambiguous}
+
+        company = self._known_company(query)
+        if company:
+            company_aliases = {
+                self._normalize(company["name"]),
+                self._normalize(company["ticker"]),
+                *(self._normalize(alias) for alias in company.get("aliases", ())),
+            }
+            company_aliases.discard("")
+            return {"strong": company_aliases, "ambiguous": set()}
+
+        strong, ambiguous = {query}, set()
         return {"strong": strong, "ambiguous": ambiguous}
+
+    def _known_company(self, normalized_query):
+        for company in TickerResolverAgent.COMPANY_CATALOG:
+            identifiers = {
+                self._normalize(company["ticker"]),
+                self._normalize(company["name"]),
+                *(self._normalize(alias) for alias in company.get("aliases", ())),
+            }
+            if normalized_query in identifiers:
+                return company
+
+        return None
 
     @staticmethod
     def _normalize(value):

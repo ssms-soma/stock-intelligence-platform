@@ -24,6 +24,12 @@ class StockDataAgent:
     FAST_INFO_TIMEOUT_SECONDS = 4
     HISTORY_TIMEOUT_SECONDS = 8
     FALLBACK_PRICE_TIMEOUT_SECONDS = 5
+    HISTORY_INTERVALS = {
+        "1d": "5m",
+        "5d": "1d",
+        "1mo": "1d",
+        "6mo": "1d",
+    }
 
     def get_stock_data(self, ticker: str):
         stock = yf.Ticker(ticker)
@@ -152,6 +158,7 @@ class StockDataAgent:
         return stock_data
 
     def get_stock_history(self, ticker: str, period: str = "6mo"):
+        interval = self._history_interval(period)
         chart_history = self._get_chart_history(ticker, period)
 
         if chart_history:
@@ -159,7 +166,11 @@ class StockDataAgent:
 
         stock = yf.Ticker(ticker)
         history = self._safe_call(
-            lambda: stock.history(period=period, timeout=self.HISTORY_TIMEOUT_SECONDS),
+            lambda: stock.history(
+                period=period,
+                interval=interval,
+                timeout=self.HISTORY_TIMEOUT_SECONDS,
+            ),
             timeout_seconds=self.HISTORY_TIMEOUT_SECONDS + 2,
             label=f"history:{period}",
             ticker=ticker,
@@ -170,6 +181,7 @@ class StockDataAgent:
                 lambda: yf.download(
                     ticker,
                     period=period,
+                    interval=interval,
                     progress=False,
                     threads=False,
                     timeout=self.HISTORY_TIMEOUT_SECONDS,
@@ -184,7 +196,7 @@ class StockDataAgent:
 
         return [
             {
-                "date": index.strftime("%Y-%m-%d"),
+                "date": self._format_history_timestamp(index, interval),
                 "open": self._round_price(
                     self._get_row_value(row, "Open", ticker)
                 ),
@@ -239,6 +251,7 @@ class StockDataAgent:
         }
 
     def _get_chart_history(self, ticker: str, period: str):
+        interval = self._history_interval(period)
         chart = self._get_chart_result(ticker, period)
 
         if not chart:
@@ -257,10 +270,10 @@ class StockDataAgent:
 
             history.append(
                 {
-                    "date": datetime.fromtimestamp(
-                        timestamp,
-                        tz=timezone.utc,
-                    ).strftime("%Y-%m-%d"),
+                    "date": self._format_history_timestamp(
+                        datetime.fromtimestamp(timestamp, tz=timezone.utc),
+                        interval,
+                    ),
                     "open": self._round_price(
                         self._chart_value(quote_data, "open", index)
                     ),
@@ -294,7 +307,7 @@ class StockDataAgent:
                         f"https://{host}/v8/finance/chart/{encoded_ticker}",
                         params={
                             "range": period or "6mo",
-                            "interval": "1d",
+                            "interval": self._history_interval(period),
                             "events": "div,splits",
                         },
                         headers={"User-Agent": "Mozilla/5.0"},
@@ -322,6 +335,18 @@ class StockDataAgent:
             label=f"chart:{period}",
             ticker=ticker,
         )
+
+    def _history_interval(self, period: str):
+        return self.HISTORY_INTERVALS.get(period or "6mo", "1d")
+
+    def _format_history_timestamp(self, value, interval: str):
+        if interval == "1d":
+            return value.strftime("%Y-%m-%d")
+
+        if hasattr(value, "to_pydatetime"):
+            value = value.to_pydatetime()
+
+        return value.isoformat()
 
     def _chart_value(self, quote_data, field: str, index: int):
         values = quote_data.get(field) or []
