@@ -1,5 +1,8 @@
 import { BrowserRouter, Link, Route, Routes } from "react-router-dom";
+import AppHeader from "./components/AppHeader";
 import Dashboard from "./pages/Dashboard";
+import Login from "./pages/Login";
+import Signup from "./pages/Signup";
 
 function NotFound() {
   return (
@@ -37,12 +40,15 @@ function NotFound() {
 function App() {
   return (
     <BrowserRouter>
+      <AppHeader />
       <Routes>
         <Route path="/" element={<Dashboard key="landing" />} />
         <Route
           path="/stock/:ticker"
           element={<Dashboard key="stock-detail" />}
         />
+        <Route path="/login" element={<Login />} />
+        <Route path="/signup" element={<Signup />} />
         <Route path="*" element={<NotFound />} />
       </Routes>
     </BrowserRouter>
