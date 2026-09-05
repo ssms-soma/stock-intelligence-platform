@@ -305,6 +305,137 @@ body {
   font-weight: 750;
 }
 
+.watchlist-control {
+  display: grid;
+  justify-items: end;
+  gap: 0.35rem;
+  margin-top: 0.8rem;
+}
+
+.watchlist-button {
+  border: 1px solid #2563eb;
+  border-radius: 4px;
+  padding: 0.55rem 0.85rem;
+  background: #ffffff;
+  color: #1d4ed8;
+  font: inherit;
+  font-size: 0.86rem;
+  font-weight: 750;
+  cursor: pointer;
+}
+
+.watchlist-button.is-watching {
+  background: #2563eb;
+  color: #ffffff;
+}
+
+.watchlist-button:disabled {
+  cursor: wait;
+  opacity: 0.65;
+}
+
+.watchlist-control-error {
+  max-width: 220px;
+  color: #b91c1c;
+  font-size: 0.75rem;
+  text-align: right;
+}
+
+.watchlist-page {
+  flex: 1;
+  min-height: calc(100svh - 68px);
+  box-sizing: border-box;
+  padding: 3rem 2rem;
+  background: #f8fafc;
+  color: #0f172a;
+  text-align: left;
+}
+
+.watchlist-panel {
+  width: min(100%, 900px);
+  margin: 0 auto;
+}
+
+.watchlist-panel h1 {
+  margin: 0;
+  font-size: 2rem;
+  letter-spacing: 0;
+}
+
+.watchlist-eyebrow {
+  margin-bottom: 0.4rem;
+  color: #2563eb;
+  font-size: 0.78rem;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.watchlist-intro,
+.watchlist-status {
+  color: #64748b;
+}
+
+.watchlist-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+  gap: 1rem;
+  margin-top: 1.5rem;
+}
+
+.watchlist-card {
+  display: grid;
+  gap: 0.4rem;
+  border: 1px solid #dbe3ef;
+  border-radius: 8px;
+  padding: 1.25rem;
+  background: #ffffff;
+  color: #0f172a;
+  text-decoration: none;
+}
+
+.watchlist-card:hover {
+  border-color: #2563eb;
+}
+
+.watchlist-card strong {
+  font-size: 1.15rem;
+}
+
+.watchlist-card span {
+  color: #64748b;
+  font-size: 0.85rem;
+}
+
+.watchlist-empty,
+.watchlist-error {
+  margin-top: 1.5rem;
+  border: 1px solid #dbe3ef;
+  border-radius: 8px;
+  padding: 1.25rem;
+  background: #ffffff;
+}
+
+.watchlist-empty a,
+.watchlist-error button {
+  color: #2563eb;
+  font-weight: 750;
+}
+
+.watchlist-error {
+  border-color: #fecaca;
+  background: #fef2f2;
+  color: #991b1b;
+}
+
+.watchlist-error button {
+  border: 0;
+  padding: 0;
+  background: transparent;
+  font: inherit;
+  cursor: pointer;
+}
+
 @media (max-width: 720px) {
   .app-header {
     align-items: flex-start;
@@ -327,6 +458,10 @@ body {
 
   .auth-card {
     padding: 1.35rem;
+  }
+
+  .watchlist-page {
+    padding: 1.5rem 1rem;
   }
 }
 

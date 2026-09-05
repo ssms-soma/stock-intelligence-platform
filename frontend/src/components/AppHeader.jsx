@@ -18,6 +18,9 @@ function AppHeader() {
           </span>
         ) : isAuthenticated ? (
           <>
+            <Link className="app-nav-link" to="/watchlist">
+              Watchlist
+            </Link>
             <span className="app-user-label" title={user?.email}>
               {userLabel}
             </span>

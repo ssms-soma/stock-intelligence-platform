@@ -3,6 +3,7 @@ import AppHeader from "./components/AppHeader";
 import Dashboard from "./pages/Dashboard";
 import Login from "./pages/Login";
 import Signup from "./pages/Signup";
+import Watchlist from "./pages/Watchlist";
 
 function NotFound() {
   return (
@@ -49,6 +50,7 @@ function App() {
         />
         <Route path="/login" element={<Login />} />
         <Route path="/signup" element={<Signup />} />
+        <Route path="/watchlist" element={<Watchlist />} />
         <Route path="*" element={<NotFound />} />
       </Routes>
     </BrowserRouter>

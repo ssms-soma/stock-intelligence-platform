@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Link, Navigate, useNavigate } from "react-router-dom";
+import { Link, Navigate, useLocation, useNavigate } from "react-router-dom";
 import { AuthApiError } from "../api/authApi";
 import useAuth from "../auth/useAuth";
 
@@ -20,6 +20,7 @@ function getLoginError(error) {
 }
 
 function Login() {
+  const location = useLocation();
   const navigate = useNavigate();
   const { isAuthenticated, isLoading, login } = useAuth();
   const [email, setEmail] = useState("");
@@ -27,12 +28,20 @@ function Login() {
   const [error, setError] = useState("");
   const [submitting, setSubmitting] = useState(false);
 
+  const requestedPath = location.state?.from;
+  const returnPath =
+    typeof requestedPath === "string" &&
+    requestedPath.startsWith("/") &&
+    !requestedPath.startsWith("//")
+      ? requestedPath
+      : "/";
+
   if (isLoading) {
     return <main className="auth-page"><p>Checking your session...</p></main>;
   }
 
   if (isAuthenticated) {
-    return <Navigate to="/" replace />;
+    return <Navigate to={returnPath} replace />;
   }
 
   async function handleSubmit(event) {
@@ -58,7 +67,7 @@ function Login() {
 
     try {
       await login({ email, password });
-      navigate("/", { replace: true });
+      navigate(returnPath, { replace: true });
     } catch (requestError) {
       setError(getLoginError(requestError));
     } finally {

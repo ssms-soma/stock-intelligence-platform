@@ -3,6 +3,7 @@ import {
   formatMarketLabel,
   getMarketInfo,
 } from "../utils/marketUtils";
+import WatchlistButton from "./WatchlistButton";
 
 function renderValue(value, fallback = "N/A") {
   if (value === null || value === undefined || value === "") return fallback;
@@ -138,6 +139,7 @@ function StockOverviewCard({ stockData }) {
               stockData
             )}
           </strong>
+          <WatchlistButton ticker={stockData?.ticker} />
         </div>
       </div>
 

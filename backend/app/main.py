@@ -15,6 +15,7 @@ from app.api.routes.router_routes import router as router_router
 from app.api.routes.search_routes import router as search_router
 from app.api.routes.sentiment_routes import router as sentiment_router
 from app.api.routes.stock_routes import router as stock_router
+from app.api.routes.watchlist_routes import router as watchlist_router
 
 app = FastAPI(
     title="AI Stock Intelligence Platform API",
@@ -44,3 +45,4 @@ app.include_router(router_router, prefix="/api")
 app.include_router(search_router, prefix="/api")
 app.include_router(sentiment_router, prefix="/api")
 app.include_router(llm_router, prefix="/api")
+app.include_router(watchlist_router, prefix="/api")
