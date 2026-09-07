@@ -1,381 +1,265 @@
 # AI Stock Intelligence Platform
 
-A full-stack stock research platform that combines market data, company intelligence, AI agents, local LLMs, and RAG-based document Q&A.
+Explore companies, review market context, ask AI-assisted questions, and save research to a personal account.
 
-The project started as a stock dashboard and has evolved into an AI-powered research assistant for exploring listed companies, understanding business fundamentals, reading market context, and asking questions against uploaded company documents.
+## Overview
 
-## Current Status
+This full-stack research application combines a React dashboard, a FastAPI backend, PostgreSQL user data, deterministic analysis, and optional language-model generation. It is primarily a local-development and portfolio project, not a claim of production deployment or guaranteed real-time market data.
 
-The platform currently supports:
+## Current Features
 
-* Stock search by ticker and company name
-* Real-time stock overview using `yfinance`
-* Historical price charts
-* Company profile intelligence
-* News retrieval with sentiment labels
-* Rule-based research summaries
-* Related company recommendations
-* Backend agent architecture
-* Local LLM support through Ollama
-* AI Research Assistant on the stock detail page
-* RAG over uploaded `.txt` and `.md` documents
-* Document-grounded answers with source metadata
+### Public Stock Intelligence
 
-This is an active long-term project. The current version focuses on building a clean AI research foundation before adding accounts, portfolios, persistence, and social investing features.
+- Search curated company aliases or enter exact tickers, including Indian market symbols such as `INFY.NS`.
+- View stock metrics, company profiles, currency-aware prices, market headlines, and related companies.
+- Explore 1D, 5D, 1M, and 6M charts. The 1D range uses 5-minute candles; the other supported ranges use daily candles.
+- Read news with sentiment labels and structured, rule-based research summaries.
+
+Data is request-based and cached where appropriate. Yahoo Finance chart requests and yfinance provide fallback paths. News uses NewsAPI when configured, Yahoo fallback, and company-alias/relevance filtering.
+
+### Accounts, Watchlists, and Saved Research
+
+- Register and log in with email/password.
+- Restore a stored access token through `GET /api/auth/me`.
+- Maintain a personal Watchlist with normalized tickers.
+- Save a Research Summary, browse saved metadata, open full snapshots, and delete them after confirmation.
+
+Ownership comes from the authenticated user on the server; the frontend does not submit `user_id` for owned resources. Watchlists enforce uniqueness per user/ticker. Saved Research allows repeated snapshots, including identical content.
+
+Saved Research preserves the selected structured summary, warnings, and currency metadata. It does not save the raw stock/news envelope, chat answers, or document results. Opening a snapshot does not regenerate research.
+
+### AI Assistant and Document Q&A
+
+| Workflow | Implementation |
+|---|---|
+| Research Summary | Deterministic rules combine price movement, sentiment, valuation fields, and signals; no LLM generation. |
+| Stock-context chat | Configured generation uses question-aware company, stock, history, news, research, or recommendation context. |
+| Document Q&A | Extraction, chunking, embeddings, and retrieval supply context to configured generation. |
+
+Uploads support UTF-8 TXT/Markdown and text-based PDFs. Answers include retrieval source metadata and PDF page references where available. PDF extraction does not perform OCR.
+
+Ollama can provide `llama3.1:8b` generation and `nomic-embed-text` embeddings when the respective providers are enabled. Null providers disable those capabilities. An OpenAI-compatible generation adapter also exists.
 
 ## Tech Stack
 
-### Frontend
+| Area | Technologies |
+|---|---|
+| Frontend | React, Vite, React Router, Recharts, CSS, Fetch, AuthContext |
+| Backend | Python, FastAPI, Pydantic, Uvicorn |
+| Persistence | PostgreSQL, SQLAlchemy, psycopg, Alembic |
+| Authentication | PyJWT, pwdlib with Argon2 |
+| Market/news analysis | Yahoo Finance, yfinance, NewsAPI, TextBlob, financial-term sentiment rules |
+| AI/documents | Provider abstractions, Ollama, pypdf, custom chunking and in-memory cosine retrieval |
+| Validation | unittest, FastAPI TestClient, SQLite fixtures, ESLint, Vite build |
 
-* React
-* Vite
-* React Router
-* Recharts
-* Native Fetch API
+Canonical dependency versions are in [backend requirements](backend/requirements.txt), [frontend package metadata](frontend/package.json), and the frontend lockfile.
 
-### Backend
+## Architecture
 
-* FastAPI
-* Python
-* yfinance
-* NewsAPI
-* TextBlob
-* Ollama
-* In-memory caching
-* In-memory vector retrieval for local RAG prototype
-
-### AI and RAG
-
-* Provider-neutral LLM abstraction
-* Null LLM provider
-* OpenAI-compatible provider
-* Ollama chat provider
-* Provider-neutral embedding abstraction
-* Ollama embedding provider
-* Local embedding model: `nomic-embed-text`
-* Local chat model: `llama3.1:8b`
-* Deterministic chunking
-* Cosine similarity retrieval
-* Request-scoped and uploaded-document RAG flows
-
-## Features
-
-## Stock Research
-
-Users can search for a company or ticker and view:
-
-* Current stock price and key metrics
-* Historical price chart
-* Market metadata
-* Currency-aware formatting
-* Company profile
-* Business summary
-* News articles
-* Sentiment analysis
-* Rule-based research summary
-* Related companies
-
-The search system supports both exact tickers and company names, for example:
-
-* `Infosys` → `INFY.NS`
-* `Reliance` → `RELIANCE.NS`
-* `TCS` → `TCS.NS`
-* `Apple` → `AAPL`
-* `Microsoft` → `MSFT`
-
-## AI Research Assistant
-
-The stock detail page includes an AI Research Assistant that can answer company-focused questions using the selected ticker.
-
-Example questions:
-
-* What does this company do?
-* Explain this company simply.
-* What are the main business areas?
-* What should I know about this company?
-
-The assistant sends the active ticker to the backend and uses company context when available.
-
-## Document Q&A
-
-The assistant also supports document-based Q&A for uploaded text files.
-
-Supported file types:
-
-* `.txt`
-* `.md`
-
-Flow:
-
-1. Upload a UTF-8 text or markdown file.
-2. Backend extracts text.
-3. Text is chunked.
-4. Chunks are embedded using Ollama.
-5. The document is indexed in process memory.
-6. User asks questions against the uploaded document.
-7. The answer is generated using retrieved chunks and returned with source metadata.
-
-Current limitations:
-
-* Uploaded documents are stored only in backend process memory.
-* Uploaded document indexes are cleared when the backend restarts.
-* PDF support is not implemented yet.
-* No persistent vector database is used yet.
-
-## Backend Architecture
-
-The backend follows a layered architecture:
+Public intelligence follows `route → service → agent → provider or rules`. Owned data follows `route → auth dependency → service → SQLAlchemy/PostgreSQL`.
 
 ```text
-API Route
-↓
-Service
-↓
-Agent
-↓
-Provider / External API / Logic
+User
+ ├── WatchlistItem
+ └── SavedResearch
 ```
 
-Examples:
+Uploaded-document indexes and vectors remain in process memory; they are not PostgreSQL-backed or user-owned. See [Architecture](ARCHITECTURE.md).
+
+## Project Structure
 
 ```text
-chat_routes.py
-↓
-ChatService
-↓
-ChatAgent / LLMAgent / RAGService
+backend/
+  app/
+    api/routes/       HTTP endpoints
+    auth/             Password/JWT helpers and current-user dependency
+    db/               SQLAlchemy base and sessions
+    models/           User, WatchlistItem, SavedResearch
+    schemas/          Auth and owned-resource validation
+    services/         Orchestration and persistence
+    agents/           Market, research, routing, and AI logic
+    llm/              Generation providers
+    embeddings/       Embedding providers
+    documents/        Extraction and in-process indexes
+    rag/              Chunking and vector retrieval
+  alembic/            Schema migrations
+  tests/              Backend tests
+frontend/
+  src/
+    pages/            Dashboard, account, Watchlist, Saved Research
+    components/       Stock, research, chat/document, and shared UI
+    auth/             AuthContext and token storage
+    api/              Fetch helpers and public-data caching
+    utils/            Market formatting
+docs/                 Documentation index
 ```
 
-```text
-rag_routes.py
-↓
-RAGService
-↓
-RAGAgent
-↓
-Embedding Provider + Vector Store
-```
+## API Overview
 
-```text
-search_routes.py
-↓
-TickerResolverService
-↓
-TickerResolverAgent
-```
+All application routes below use the `/api` prefix. Full schemas are available at [local FastAPI docs](http://127.0.0.1:8000/docs).
 
-This keeps routes thin, services responsible for orchestration, and agents focused on intelligence or retrieval logic.
+| Group | Major endpoints |
+|---|---|
+| Auth entry; no existing session required | `POST /auth/register`, `POST /auth/login`, `POST /auth/token` |
+| Public stock/research | `GET /health`, `GET /search/resolve`, `GET /stocks/{ticker}`, `GET /stocks/{ticker}/history`, `GET /company/{ticker}`, `GET /news/{query}`, `POST /sentiment`, `GET /research/{ticker}`, `GET /recommendations/{ticker}`, `GET /router/{ticker}` |
+| Public AI/document | `GET /llm/status`, `POST /llm/test`, `POST /chat`, `POST /rag/test`, `POST /documents/upload`, `POST /documents/{document_id}/ask` |
+| Authenticated user data | `GET /auth/me`, `GET/POST /watchlist`, `DELETE /watchlist/{ticker}`, `GET/POST /saved-research`, `GET/DELETE /saved-research/{id}` |
 
-## Main Backend Agents
-
-Current backend agents include:
-
-* `StockDataAgent`
-* `NewsAgent`
-* `SentimentAgent`
-* `ResearchAgent`
-* `CompanyAgent`
-* `RecommendationAgent`
-* `RouterAgent`
-* `LLMAgent`
-* `RAGAgent`
-* `ChatAgent`
-* `TickerResolverAgent`
-
-## Main API Endpoints
-
-### Core
-
-```text
-GET  /api/health
-GET  /api/stocks/{ticker}
-GET  /api/stocks/{ticker}/history
-GET  /api/news/{query}
-POST /api/sentiment
-GET  /api/research/{ticker}
-GET  /api/company/{ticker}
-GET  /api/recommendations/{ticker}
-GET  /api/router/{ticker}?intent=...
-```
-
-### Phase 3 AI Endpoints
-
-```text
-GET  /api/llm/status
-POST /api/llm/test
-GET  /api/search/resolve?query=...
-POST /api/rag/test
-POST /api/chat
-POST /api/documents/upload
-POST /api/documents/{document_id}/ask
-```
+Protected requests use Bearer access tokens. `/auth/token` accepts an OAuth2-compatible form for Swagger, with email supplied as `username`; this is not social OAuth login.
 
 ## Local Setup
 
-## Backend
+Local setup follows the repository's current configuration. It has not been verified on a fresh machine.
 
-The supported backend runtime is Python 3.12.
+### Prerequisites
 
-Go to the backend folder:
+- Python 3.12.
+- Node/npm compatible with Vite 8: Node 20.19+ in the 20.x line, or 22.12+.
+- A running PostgreSQL server, a database, and an application role.
+- Optional Ollama for local generation and embeddings.
+
+Examples use PowerShell. Explicit Python paths avoid requiring environment activation; `npm.cmd` avoids PowerShell blocking `npm.ps1`.
+
+### Backend Environment and Dependencies
+
+From the repository root:
 
 ```powershell
 cd backend
-```
-
-Create a Python 3.12 virtual environment, activate it, and install dependencies:
-
-```powershell
 py -3.12 -m venv .venv
-.\.venv\Scripts\activate
-python -m pip install -r requirements.txt
+.\.venv\Scripts\python.exe -m pip install -r requirements.txt
 ```
 
-If the Windows Python launcher does not detect installed interpreters, invoke
-the Python 3.12 executable by its full path for the `-m venv .venv` command.
+If the Python launcher cannot find Python 3.12, use its installed executable path to create the environment.
 
-Create a `.env` file in the backend folder.
-
-Example local configuration:
-
-```env
-NEWS_API_KEY=your_news_api_key_here
-
-LLM_PROVIDER=ollama
-LLM_MODEL=llama3.1:8b
-LLM_BASE_URL=http://localhost:11434
-LLM_TIMEOUT=60
-LLM_TEMPERATURE=0.3
-LLM_MAX_TOKENS=700
-
-EMBEDDING_PROVIDER=ollama
-EMBEDDING_MODEL=nomic-embed-text
-EMBEDDING_BASE_URL=http://localhost:11434
-EMBEDDING_TIMEOUT=60
-
-RAG_CHUNK_SIZE=1000
-RAG_CHUNK_OVERLAP=150
-RAG_RETRIEVAL_K=5
-
-DOCUMENT_UPLOAD_MAX_BYTES=1048576
-DOCUMENT_TEXT_MAX_CHARS=100000
-DOCUMENT_INDEX_MAX_DOCUMENTS=25
-```
-
-Start Ollama and install the required local models if they are not already
-available:
+Copy the template only if no local environment file exists:
 
 ```powershell
-ollama serve
+if (-not (Test-Path -LiteralPath .env)) {
+    Copy-Item -LiteralPath .env.example -Destination .env
+}
+```
+
+Configure your own values privately in `backend/.env`. Do not commit it or put credentials in frontend code.
+
+- Set `DATABASE_URL` for your database using the SQLAlchemy `postgresql+psycopg` driver.
+- Set your own securely generated `JWT_SECRET_KEY`. Algorithm and token lifetime are configurable.
+- Configure generation and embedding providers independently.
+- `NEWS_API_KEY` is optional because Yahoo fallback exists.
+
+Configuration loads `backend/.env` by an explicit path. The template selects Ollama generation but leaves embeddings disabled. See [the template](backend/.env.example) for names and limits; no full environment copy is needed here.
+
+### PostgreSQL and Migrations
+
+Create a database and application role using your PostgreSQL administration tools. Grant the role permissions to create/use the application tables and configure its connection privately.
+
+From `backend`, apply migrations before using authenticated features:
+
+```powershell
+.\.venv\Scripts\python.exe -m alembic upgrade head
+.\.venv\Scripts\python.exe -m alembic current
+```
+
+Database connection configuration is required during application initialization. Disabling AI does not remove that requirement. Starting Uvicorn does not apply migrations.
+
+### Optional Ollama Setup
+
+Ensure Ollama is running; use `ollama serve` if the local Ollama application is not already managing it. Pull only models needed for the enabled capabilities:
+
+```powershell
 ollama pull llama3.1:8b
 ollama pull nomic-embed-text
 ollama list
 ```
 
-Run the backend:
+For generation, select `LLM_PROVIDER=ollama` with the matching model/base URL. For document indexing, select `EMBEDDING_PROVIDER=ollama` with `nomic-embed-text`. Generation alone does not require the embedding model.
 
-```powershell
-python -m uvicorn app.main:app --reload
-```
+Set the respective provider to `none` to disable it. Document Q&A needs functioning embeddings and generation for grounded answers.
 
-Backend runs at:
+### Frontend
 
-```text
-http://127.0.0.1:8000
-```
-
-## Frontend
-
-Go to the frontend folder:
+From a new terminal at the repository root:
 
 ```powershell
 cd frontend
+npm.cmd ci
 ```
 
-Install dependencies:
+## Running the App
+
+From `backend`:
 
 ```powershell
-npm install
+.\.venv\Scripts\python.exe -m uvicorn app.main:app --reload
 ```
 
-Run the frontend:
+From `frontend`, in another terminal:
 
 ```powershell
 npm.cmd run dev
 ```
 
-Frontend runs at:
+- Backend: [http://127.0.0.1:8000](http://127.0.0.1:8000)
+- Interactive docs: [http://127.0.0.1:8000/docs](http://127.0.0.1:8000/docs)
+- Frontend: [http://localhost:5173](http://localhost:5173)
 
-```text
-http://localhost:5173
-```
+Vite proxies `/api` to the backend. Development CORS allows `http://localhost:5173`; use that frontend origin with the current configuration.
 
 ## Testing
 
-Backend tests:
+From `backend`, after configuring the backend environment:
 
 ```powershell
-cd backend
-python -m unittest discover -s tests -p "test_*.py" -v
-python mvp_smoke.py
+.\.venv\Scripts\python.exe -m unittest discover -s tests -p "test_*.py" -v
 ```
 
-Frontend build:
+Deterministic tests use controlled/local fixtures, mocks, and dependency overrides. Persistence route tests use SQLite instead of writing test records into the normal PostgreSQL database. Application imports still require database configuration.
+
+From `frontend`:
 
 ```powershell
-cd frontend
+npm.cmd run lint
 npm.cmd run build
 ```
 
-Frontend lint:
+No frontend browser/unit testing framework is configured; interaction checks are manual.
+
+Optional live checks, from `backend`:
 
 ```powershell
-cd frontend
-npm.cmd run lint
+.\.venv\Scripts\python.exe mvp_smoke.py
 ```
+
+This script may contact market/news services and configured AI providers. It reports PASS/SKIP/FAIL and is separate from deterministic tests. Read its output: successful process exit alone does not guarantee every check passed.
 
 ## Current Limitations
 
-The current version is designed for local development and portfolio demonstration.
+- External providers can fail or return incomplete/delayed data. Prices are not guaranteed real-time.
+- Company aliases and related-company recommendations use deterministic rules, not exhaustive discovery or personalized ML.
+- PDF extraction is text-based; scanned/image-only and encrypted PDFs are unsupported.
+- Uploaded-document indexes live in backend process memory, disappear on restart, and have no persistent user ownership.
+- Chat is single-turn with no persisted conversation history.
+- Saved Research is a repeatable snapshot, not a versioned report or live market view.
+- Access tokens are stored in browser localStorage; refresh tokens and social login are not implemented.
+- Frontend automated interaction tests are not configured.
+- The system is primarily for local development/portfolio demonstration, not a claim of production scale.
 
-Known limitations:
-
-* Ollama is used locally for development.
-* RAG document indexes are stored in process memory only.
-* Uploaded documents disappear after backend restart.
-* Only `.txt` and `.md` uploads are supported.
-* PDF extraction is not implemented yet.
-* No persistent vector database yet.
-* No PostgreSQL integration yet.
-* No authentication or user accounts yet.
-* No saved research history yet.
-* Chat is currently single-turn.
-* The platform does not provide financial advice.
+The platform is for research and education, not financial advice.
 
 ## Roadmap
 
-Near-term planned improvements:
+Future directions, not delivery commitments:
 
-* PDF extraction with page-aware citations
-* Persistent document indexing
-* RAG-backed document library
-* Richer AI assistant modes using stock, news, research, and filings
-* Conversation-style chat UI
-* Saved research outputs
+- Portfolio tracking and preferences/personalization.
+- Conversation history.
+- Persistent user-owned documents and RAG indexes.
+- Richer social/discovery experiences.
+- Production/deployment hardening.
 
-Long-term roadmap:
+## Project Documentation
 
-* PostgreSQL database
-* User authentication
-* Watchlists
-* Portfolio tracking
-* Saved AI research
-* Social investing features
-* Community discussions
-* Swipe-based stock discovery
-* Personalized recommendation engine
-
-## Project Direction
-
-This project is not intended to be a simple stock price prediction app. The goal is to build a practical AI stock research platform that combines market data, company intelligence, AI agents, and document-grounded reasoning into one workflow.
-
-The long-term vision is to evolve it into a social investing and research platform where users can explore companies, ask AI-assisted questions, compare stocks, save research, and eventually interact with a community around investment ideas.
+- [Architecture](ARCHITECTURE.md): flows and storage boundaries.
+- [Project evolution](PROJECT.md): milestones and direction.
+- [Documentation index](docs/README.md).
+- [Backend orientation](backend/README.md).
+- [Frontend orientation](frontend/README.md).

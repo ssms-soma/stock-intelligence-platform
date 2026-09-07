@@ -1,16 +1,38 @@
-# React + Vite
+# Frontend
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+React/Vite renders public stock intelligence, the chat/document assistant, and authenticated Watchlist/Saved Research workflows.
 
-Currently, two official plugins are available:
+## Structure
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+- `src/pages`: Dashboard, Login, Signup, Watchlist, SavedResearch, SavedResearchDetail.
+- `src/components`: stock cards/charts, ResearchSummary, AIResearchAssistant, navigation, save/watch controls.
+- `src/auth`: AuthContext, session restoration, localStorage token helpers.
+- `src/api`: Fetch helpers, authenticated headers, public-data caching.
+- `src/utils`: market/currency formatting.
+- `src/index.css`: shared and feature-specific styles.
 
-## React Compiler
+React Router serves `/` and `/stock/:ticker` publicly, account entry at `/login` and `/signup`, and protected pages at `/watchlist`, `/saved-research`, and `/saved-research/:id`.
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+AuthContext restores sessions through `/api/auth/me`. Private calls send Bearer tokens; ownership is derived by the backend, not supplied by the UI.
 
-## Expanding the ESLint configuration
+## Development Commands
 
-If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and [`typescript-eslint`](https://typescript-eslint.io) in your project.
+After [root setup](../README.md#local-setup), run from this directory:
+
+```powershell
+npm.cmd ci
+npm.cmd run dev
+```
+
+Open [http://localhost:5173](http://localhost:5173). Vite proxies `/api` to `http://127.0.0.1:8000`; run the backend separately. Keep credentials in the backend environment.
+
+## Validation
+
+```powershell
+npm.cmd run lint
+npm.cmd run build
+```
+
+No frontend browser/unit testing framework is configured. Manual checks cover navigation, auth redirects, save/delete states, document interactions, and responsive layouts.
+
+See [architecture](../ARCHITECTURE.md#frontend-architecture) for data-flow boundaries.

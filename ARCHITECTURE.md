@@ -1,415 +1,179 @@
 # Architecture
 
-## Overview
+## System Boundaries
 
-AI Stock Intelligence Platform is organized as a FastAPI backend and a React + Vite frontend. The backend exposes market-data, research, search, LLM, RAG, and chat endpoints through route modules. Backend services coordinate specialized agents, and the frontend consumes those APIs through small API helper modules.
-
-The established research summary remains rule-based. Phase 3 adds an isolated provider-neutral LLM layer, deterministic company-name resolution, a request-scoped RAG prototype, a single-turn chat API, and a stock-page AI Research Assistant. These additions do not replace the existing stock and research workflows.
-
-The primary backend layering convention is:
+React/Vite consumes FastAPI endpoints under `/api`. Public intelligence and AI/document workflows coexist with authenticated PostgreSQL user data.
 
 ```text
-API route
-  ↓
-Service
-  ↓
-Agent
-  ↓
-Provider / external API / deterministic logic
+React + React Router
+  ├── Public dashboard and stock detail
+  ├── AIResearchAssistant: chat and document Q&A
+  └── AuthContext: login, Watchlist, Saved Research
+         |
+         v
+FastAPI routes
+  ├── Intelligence services → agents → providers / rules
+  ├── Document service → extraction → RAG → generation
+  └── get_current_user → persistence services → SQLAlchemy → PostgreSQL
 ```
 
-## Backend Architecture
+Routes stay thin. Intelligence services orchestrate agents; persistence services use database sessions directly. Not every endpoint requires an agent.
 
-### Routes
+## Backend Organization
 
-Backend routes live under:
+| Directory | Responsibility |
+|---|---|
+| `app/api/routes` | Market, research, AI, document, auth, Watchlist, Saved Research endpoints |
+| `app/services` | Orchestration, provider-result handling, caching, persistence |
+| `app/agents` | Market collection, sentiment, research, resolution, recommendations, routing, AI context |
+| `app/auth` | Password hashing, token creation/verification, current-user dependency |
+| `app/schemas` | Auth/user-resource validation; some public request models live beside routes |
+| `app/models`, `app/db` | Domain models, metadata registration, engine, sessions, declarative base |
+| `app/llm`, `app/embeddings` | Provider interfaces, factories, implementations |
+| `app/documents`, `app/rag` | Extraction, indexes, chunks, retrieval, vector search |
 
-- `backend/app/api/routes`
+`app/main.py` registers routers and development CORS. Configuration loads `backend/.env` by an explicit path. See [setup](README.md#local-setup) for environment instructions.
 
-Current route modules:
+## PostgreSQL Persistence
 
-- `health_routes.py`
-  - Health check endpoint.
-- `stock_routes.py`
-  - Stock metrics endpoint.
-  - Stock price history endpoint.
-- `news_routes.py`
-  - Company or query-based news endpoint.
-- `sentiment_routes.py`
-  - Sentiment analysis endpoint.
-- `research_routes.py`
-  - Research summary endpoint.
-- `company_routes.py`
-  - Company profile endpoint.
-- `recommendation_routes.py`
-  - Related-company recommendation endpoint.
-- `router_routes.py`
-  - Deterministic intent-routing endpoint.
-- `llm_routes.py`
-  - LLM status and isolated prompt-test endpoints.
-- `search_routes.py`
-  - Company-name and ticker resolution endpoint.
-- `rag_routes.py`
-  - Request-supplied sample-document RAG test endpoint.
-- `chat_routes.py`
-  - Single-turn AI research chat endpoint.
-
-The FastAPI app is created in:
-
-- `backend/app/main.py`
-
-Routers are included with the `/api` prefix.
-
-### Services
-
-Backend services live under:
-
-- `backend/app/services`
-
-Current service modules:
-
-- `stock_service.py`
-- `news_service.py`
-- `sentiment_service.py`
-- `research_service.py`
-- `company_service.py`
-- `recommendation_service.py`
-- `llm_service.py`
-- `ticker_resolver_service.py`
-- `rag_service.py`
-- `chat_service.py`
-
-Services provide the coordination layer between API routes and agents. They keep route handlers thin and isolate stock, news, sentiment, research, search, RAG, and chat workflows.
-
-### Agents
-
-Backend agents live under:
-
-- `backend/app/agents`
-
-Existing agents:
-
-- `StockDataAgent`
-  - Fetches and prepares stock metrics and historical price data.
-- `NewsAgent`
-  - Fetches company or market news.
-- `SentimentAgent`
-  - Computes sentiment using TextBlob.
-- `ResearchAgent`
-  - Produces the current rule-based research summary.
-- `CompanyAgent`
-  - Builds structured company profile context through yfinance.
-- `RecommendationAgent`
-  - Produces deterministic related-company suggestions.
-- `RouterAgent`
-  - Routes supported explicit intents across existing services.
-- `TickerResolverAgent`
-  - Resolves curated company aliases and preserves ticker-shaped input.
-- `LLMAgent`
-  - Provides provider-neutral natural-language generation.
-- `RAGAgent`
-  - Retrieves relevant chunks and builds source metadata.
-- `ChatAgent`
-  - Selects deterministic chat modes and prepares compact company context.
-
-### LLM Provider Layer
-
-Language-model implementations live under `backend/app/llm`.
+SQLAlchemy uses a synchronous engine with `pool_pre_ping=True`. `get_db()` yields and closes request sessions. The session factory uses `expire_on_commit=False`.
 
 ```text
-LLMAgent
-  ↓
-LLM provider factory
-  ├── NullLLMProvider
-  ├── OpenAICompatibleProvider
-  └── OllamaProvider
+User (users)
+  ├── watchlist_items → WatchlistItem (watchlist_items)
+  └── saved_research → SavedResearch (saved_research)
 ```
 
-Provider selection is environment-driven. The null provider allows safe startup with AI disabled. Ollama supports local development, while the OpenAI-compatible implementation keeps a path open for suitable hosted providers.
+| Model | Fields and constraints |
+|---|---|
+| User | Integer ID, unique indexed email, password hash, optional display name, active flag, creation/update timestamps |
+| WatchlistItem | Integer ID, user FK, ticker, creation timestamp; unique `(user_id, ticker)` |
+| SavedResearch | Integer ID, user FK, ticker, title, portable JSON content, creation timestamp; index on `(user_id, created_at, id)` |
 
-### Embedding and RAG Layer
+Child FKs use `ON DELETE CASCADE`. Bidirectional relationships use `all, delete-orphan` and `passive_deletes=True`. This is model/database behavior, not an exposed account-deletion feature.
 
-Embedding implementations live under `backend/app/embeddings`:
+Timestamps use UTC application defaults, timezone-aware columns, and server defaults. Tickers are trimmed and uppercased.
+
+Alembic imports `app.models` to register `Base.metadata`. Migration chain:
 
 ```text
-RAGService
-  ↓
-Embedding provider factory
-  ├── NullEmbeddingProvider
-  └── OllamaEmbeddingProvider
+d69bcf88934d  users
+    ↓
+908bb8f1f14b  watchlist_items
+    ↓
+a73e92c4d601  saved_research
 ```
 
-RAG primitives live under `backend/app/rag`:
+Migrations are explicit; startup does not create or upgrade tables.
 
-- `models.py` defines document, chunk, and retrieval-result contracts.
-- `chunker.py` creates deterministic overlapping text chunks.
-- `vector_store.py` provides ephemeral in-memory cosine-similarity search.
+## Authentication and Ownership
 
-The current RAG flow is:
+1. Registration normalizes email and stores a pwdlib/Argon2 password hash.
+2. JSON login or form-compatible token entry authenticates credentials.
+3. PyJWT issues an access token with user ID in `sub` and expiry.
+4. `get_current_user()` decodes the token and loads an active user.
+5. Protected services receive `current_user.id`; frontend ownership fields are not used.
+
+`GET /api/auth/me` omits the password hash. Invalid/expired credentials or inactive/missing users return 401. `/api/auth/token` accepts email as form `username` for Swagger; it is not social OAuth.
+
+Watchlist operations filter by the current user. Duplicate normalized tickers for one user return 409.
+
+Saved Research detail/deletion filter by both ID and owner. Foreign-owned and nonexistent records return identical 404 responses. Responses omit the ownership column.
+
+## Saved Research Flow
 
 ```text
-Request-supplied sample text
-  ↓
-TextChunker
-  ↓
-Embedding provider
-  ↓
-InMemoryVectorStore
-  ↓
-RAGAgent
-  ↓
-LLMAgent
-  ↓
-Answer plus retriever-owned source metadata
+Displayed research_summary → explicit Save → authenticated POST
+  → PostgreSQL JSON snapshot → metadata list → full saved detail
 ```
 
-The vector store is created per request. No persistent document index, PDF extraction, or filing ingestion exists yet.
+The create schema accepts ticker, structured content, and optional title. It validates core report text, ticker consistency, section containers, and arrays while preserving additional fields and optional/null values. Missing/blank titles are generated from company name or ticker.
 
-### Chat Orchestration
+The UI submits the summary with warnings/market metadata, not raw stock/news envelopes, history arrays, chat answers, or document results. Repeated snapshots are permitted; there is no deduplication, regeneration, editing, or versioning.
 
-The single-turn chat path is:
+Lists omit full content and order by creation time then ID descending. Detail uses stored content through `ResearchSummary` without new research calls.
+
+## Public Market and News Flows
+
+### Stock and Company Data
+
+`StockService` normalizes tickers and uses per-instance in-memory caches: metrics for 60 seconds and nonempty history for five minutes. Unusable all-null metrics and empty history are not cached.
+
+`StockDataAgent` combines yfinance fast/info fields and fallback price sources, sanitizes non-finite numbers, and reports degraded-data warnings.
+
+History tries direct Yahoo chart data, then `Ticker.history`, then `yf.download`. Chart requests retry alternate Yahoo hosts. The 1D UI range uses 5-minute candles; 5D/1M/6M use daily candles. Intraday timestamps preserve distinct candles. This is best-effort retrieval, not streaming.
+
+Company profiles use `CompanyService`/`CompanyAgent` with yfinance and identity fallbacks. `TickerResolverAgent` resolves curated aliases and preserves ticker-shaped input without an LLM. Related-company recommendations are deterministic.
+
+### News and Sentiment
+
+`NewsAgent` builds bounded candidates from the query, known company name, and aliases. Each candidate tries NewsAPI when configured, then Yahoo news, returning the first relevant result set.
+
+Relevance checks use titles/descriptions, aliases, and business terms for ambiguous names. Known-company candidates are capped at five. Missing relevant coverage produces a warning rather than fabricated articles.
+
+`NewsService` attaches TextBlob sentiment/polarity, with financial-term rules for near-neutral text.
+
+## Research Summary
+
+`ResearchService` collects metrics, one-month history, and up to five news articles. `ResearchAgent` deterministically produces identity, overall view, confidence, price analysis, news sentiment, valuation, signal/risk/watch lists, summary text, and disclaimer.
+
+The service adds market metadata and warnings. The public response wraps `research_summary` alongside stock/news data. `ResearchSummary.jsx` renders the structured result.
+
+This path does not call an LLM and remains separate from chat generation.
+
+## Chat and Generation Providers
+
+`ChatService` coordinates `ChatAgent`, `LLMAgent`, `RAGService`, and company/stock/news/research/recommendation services.
+
+Modes are `auto`, `llm`, `company`, and `rag`. Routing is deterministic. Company-mode context selection is question-aware and can collect company profile, metrics, history, news, research, and recommendations. Responses include source/context status and warnings.
+
+Generation uses a factory with null, Ollama, and OpenAI-compatible implementations. Ollama can serve the configured `llama3.1:8b` model. Model/base URL selection belongs to configuration, not service logic; an adapter does not imply every hosted provider was tested.
+
+## Documents, Embeddings, and Retrieval
+
+Two entry paths share retrieval primitives:
+
+1. `POST /api/rag/test` and supplied-document chat build request-scoped indexes.
+2. Upload extracts/chunks/embeds once, retaining an index in `DocumentIndexStore` for later questions by document ID.
+
+Uploads support UTF-8 TXT/Markdown and text-based PDFs through pypdf. Validation covers type, byte/text limits, page count, and sufficient extracted text. Encrypted PDFs and documents without usable text are rejected. No OCR is implemented.
 
 ```text
-chat_routes.py
-  ↓
-ChatService
-  ├── ChatAgent
-  ├── LLMAgent
-  ├── CompanyService
-  └── RAGService
+Upload → extraction → page-aware text units → overlapping chunks
+       → embeddings → in-memory cosine-similarity index
+Question → query embedding → retrieval → generation
+         → answer and source/page metadata
 ```
 
-`ChatAgent` uses deterministic modes (`auto`, `llm`, `company`, and `rag`); an LLM is not used for routing. Document-backed requests delegate to `RAGService`, so retrieval and citation logic are not duplicated.
+Embedding providers are null or Ollama. `nomic-embed-text` is used when configured with enabled Ollama embeddings; the template leaves embeddings disabled.
+
+Uploaded indexes survive requests only within the same backend process and disappear on restart. They are not PostgreSQL-backed, shared across workers, or user-owned. Document endpoints are public.
 
 ## Frontend Architecture
 
-### Pages
+| Route | Page |
+|---|---|
+| `/`, `/stock/:ticker` | Route-aware Dashboard |
+| `/login`, `/signup` | Account entry |
+| `/watchlist` | Authenticated Watchlist |
+| `/saved-research`, `/saved-research/:id` | Authenticated snapshot list/detail |
 
-Frontend pages live under:
+`AuthContext` restores a localStorage access token through `/api/auth/me`. Logout clears local session/token state. There is no refresh-token or server-side token-revocation workflow.
 
-- `frontend/src/pages`
+API modules use Fetch and Bearer headers for private requests. Public GET helpers cache where appropriate. Component-local state and abort/cleanup patterns handle pending and stale requests; no global Saved Research store exists.
 
-Current page:
+`Dashboard` coordinates stock, company, history, news, and research. `AIResearchAssistant` provides chat and document Q&A with sources. `ResearchSummary` renders saved content with Save hidden.
 
-- `Dashboard.jsx`
-  - Route-aware page used for both the landing page and stock detail page.
-  - Uses React Router params to decide whether it is rendering `/` or `/stock/:ticker`.
+Logged-out Save/Watch clicks use the existing internal login return route. Save requires another explicit click after login. Saved feedback is local to the result/session. Native delete confirmation precedes the request; errors preserve cards except already-unavailable 404 results.
 
-### Components
+## Current Architectural Limitations
 
-Frontend components live under:
+- PostgreSQL covers only users, Watchlists, and Saved Research.
+- Provider failures can yield incomplete data; caches/indexes are process-local.
+- No persistent document ownership, conversation history, OCR, or automated filing ingestion.
+- No refresh tokens, social login, portfolio, or social/discovery backend.
+- Frontend automated interaction tests are not configured.
+- Development proxy/CORS and local providers are not production infrastructure.
 
-- `frontend/src/components`
-
-Current major components:
-
-- `HeroSection.jsx`
-- `MarketTickerTape.jsx`
-- `MarketHeadlines.jsx`
-- `SearchBar.jsx`
-- `CompanyProfileCard.jsx`
-- `AIResearchAssistant.jsx`
-- `StockOverviewCard.jsx`
-- `PriceChart.jsx`
-- `ResearchSummary.jsx`
-- `RelatedCompanies.jsx`
-- `NewsSection.jsx`
-- `NewsCard.jsx`
-- `SentimentBadge.jsx`
-- `SkeletonLoader.jsx`
-
-### API Helpers
-
-Frontend API helpers live under:
-
-- `frontend/src/api`
-
-Current API helper modules:
-
-- `stockApi.js`
-  - Fetches stock metrics and stock history.
-- `newsApi.js`
-  - Fetches company or market news.
-- `researchApi.js`
-  - Fetches the research summary for a ticker.
-- `companyApi.js`
-  - Fetches company profiles.
-- `recommendationApi.js`
-  - Fetches related-company recommendations.
-- `searchApi.js`
-  - Resolves company names or ticker input.
-- `chatApi.js`
-  - Sends single-turn questions to `/api/chat`.
-- `apiCache.js`
-  - Provides short-lived frontend request caching for suitable GET workflows.
-
-## Current Data Flow
-
-1. User searches a company name or ticker, or clicks a ticker/related company.
-2. Typed search uses `/api/search/resolve`; deterministic ticker selections navigate directly.
-3. React Router navigates to `/stock/:ticker`.
-4. `Dashboard.jsx` reads the ticker from the route params.
-5. The frontend calls stock, history, company, news, recommendation, and research helpers.
-6. The AI Research Assistant can send a single-turn ticker-aware request to `/api/chat`.
-7. FastAPI routes receive requests under `/api`.
-8. Services coordinate the relevant agents and provider abstractions.
-9. Backend responses include structured data and warnings where appropriate.
-10. The frontend renders the stock detail dashboard:
-   - Stock overview
-   - Company profile
-   - AI Research Assistant
-   - Price chart
-   - Research summary
-   - Related companies
-   - News
-
-## ASCII Architecture Diagram
-
-```text
-User
-  |
-  v
-React + Vite Frontend
-  |
-  |-- / -----------------------> Dashboard landing page
-  |                               - HeroSection
-  |                               - MarketTickerTape
-  |                               - SearchBar
-  |                               - MarketHeadlines
-  |
-  |-- /stock/:ticker ----------> Dashboard stock detail page
-                                  - StockOverviewCard
-                                  - CompanyProfileCard
-                                  - AIResearchAssistant
-                                  - PriceChart
-                                  - ResearchSummary
-                                  - RelatedCompanies
-                                  - NewsSection
-
-Frontend API Helpers
-  |
-  |-- stockApi.js -------------> GET /api/stocks/{ticker}
-  |                              GET /api/stocks/{ticker}/history
-  |
-  |-- newsApi.js --------------> GET /api/news/{query}
-  |
-  |-- researchApi.js ----------> GET /api/research/{ticker}
-  |
-  |-- searchApi.js ------------> GET /api/search/resolve
-  |
-  |-- chatApi.js --------------> POST /api/chat
-  |
-  v
-FastAPI Backend
-  |
-  |-- Routes ------------------> backend/app/api/routes
-  |
-  |-- Services ----------------> backend/app/services
-  |
-  |-- Agents ------------------> backend/app/agents
-        |
-        |-- StockDataAgent ----> yfinance
-        |-- NewsAgent ---------> NewsAPI
-        |-- SentimentAgent ----> TextBlob
-        |-- ResearchAgent -----> rule-based summary logic
-        |-- CompanyAgent ------> yfinance company profile
-        |-- TickerResolverAgent -> curated deterministic aliases
-        |-- LLMAgent ----------> configured LLM provider
-        |-- RAGAgent ----------> in-memory semantic retrieval
-        |-- ChatAgent ---------> deterministic chat decisions
-```
-
-## Current Research Layer
-
-The current research summary is rule-based. It combines stock movement, sentiment data, valuation-style fields, and simple signal lists into a structured summary.
-
-Current research output is rendered by:
-
-- `frontend/src/components/ResearchSummary.jsx`
-
-The rule-based research endpoint is intentionally separate from Phase 3 chat and RAG. LLM output does not silently replace the existing research summary.
-
-## Key API Endpoints
-
-- `GET /api/health`
-- `GET /api/stocks/{ticker}`
-- `GET /api/stocks/{ticker}/history`
-- `GET /api/news/{query}`
-- `POST /api/sentiment`
-- `GET /api/research/{ticker}`
-- `GET /api/company/{ticker}`
-- `GET /api/recommendations/{ticker}`
-- `GET /api/router/{ticker}?intent=...`
-- `GET /api/llm/status`
-- `POST /api/llm/test`
-- `GET /api/search/resolve?query=...`
-- `POST /api/rag/test`
-- `POST /api/chat`
-
-## Local AI Configuration
-
-```env
-NEWS_API_KEY=your_news_api_key_here
-
-LLM_PROVIDER=ollama
-LLM_MODEL=llama3.1:8b
-LLM_BASE_URL=http://localhost:11434
-LLM_TIMEOUT=60
-LLM_TEMPERATURE=0.3
-LLM_MAX_TOKENS=700
-
-EMBEDDING_PROVIDER=ollama
-EMBEDDING_MODEL=nomic-embed-text
-EMBEDDING_BASE_URL=http://localhost:11434
-EMBEDDING_TIMEOUT=60
-
-RAG_CHUNK_SIZE=1000
-RAG_CHUNK_OVERLAP=150
-RAG_RETRIEVAL_K=5
-```
-
-```powershell
-ollama pull llama3.1:8b
-ollama pull nomic-embed-text
-ollama list
-```
-
-Ollama is used for local development and is not hardcoded into services or agents.
-
-## Current Boundaries
-
-- RAG accepts request-supplied sample documents only.
-- No PDF upload, annual-report extraction, or real filing ingestion is implemented.
-- Vector storage and chat state are not persistent.
-- Chat and the frontend assistant are single-turn.
-- The frontend has no RAG document upload interface.
-- PostgreSQL, authentication, user accounts, and saved research are not implemented.
-- The AI assistant is educational and is not financial advice.
-
-## Roadmap
-
-Near-term:
-
-1. Clean the existing Dashboard lint warnings in an isolated change.
-2. Design persistent RAG document indexing.
-3. Add one controlled document source.
-4. Add RAG-backed document Q&A to the frontend.
-5. Add richer stock-, news-, and research-aware chat modes.
-
-Later:
-
-- PostgreSQL
-- Authentication and user accounts
-- Watchlists and portfolios
-- Saved AI research
-- Social investing and communities
-- Swipe-based stock discovery
-- Personalized recommendations
-
-## Development Philosophy
-
-- Build core stock intelligence first.
-- Add AI reasoning second.
-- Add user accounts and persistence third.
-- Add social recommendation features last.
+See [README](README.md) for setup and [PROJECT.md](PROJECT.md) for milestones.
 
