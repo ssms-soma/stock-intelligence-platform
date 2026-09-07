@@ -305,6 +305,44 @@ body {
   font-weight: 750;
 }
 
+.saved-research-control {
+  display: grid;
+  gap: 0.35rem;
+}
+
+.saved-research-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.saved-research-actions button {
+  border: 1px solid #dbe3ef;
+  border-radius: 4px;
+  padding: 0.4rem 0.7rem;
+  background: #ffffff;
+  color: #b91c1c;
+  cursor: pointer;
+}
+
+.saved-research-actions button:disabled {
+  opacity: 0.65;
+  cursor: wait;
+}
+
+.saved-research-title {
+  margin: 0;
+  font-size: 1rem;
+  overflow-wrap: anywhere;
+}
+
+.saved-research-detail {
+  max-width: 1200px;
+  margin: 0 auto;
+  overflow-wrap: anywhere;
+}
+
 .watchlist-control {
   display: grid;
   justify-items: end;

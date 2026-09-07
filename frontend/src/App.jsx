@@ -4,6 +4,8 @@ import Dashboard from "./pages/Dashboard";
 import Login from "./pages/Login";
 import Signup from "./pages/Signup";
 import Watchlist from "./pages/Watchlist";
+import SavedResearch from "./pages/SavedResearch";
+import SavedResearchDetail from "./pages/SavedResearchDetail";
 
 function NotFound() {
   return (
@@ -51,6 +53,8 @@ function App() {
         <Route path="/login" element={<Login />} />
         <Route path="/signup" element={<Signup />} />
         <Route path="/watchlist" element={<Watchlist />} />
+        <Route path="/saved-research" element={<SavedResearch />} />
+        <Route path="/saved-research/:id" element={<SavedResearchDetail />} />
         <Route path="*" element={<NotFound />} />
       </Routes>
     </BrowserRouter>

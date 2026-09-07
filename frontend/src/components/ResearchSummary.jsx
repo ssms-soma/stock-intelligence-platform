@@ -1,4 +1,5 @@
 import { formatCurrencyByTicker, getMarketInfo } from "../utils/marketUtils";
+import SaveResearchButton from "./SaveResearchButton";
 
 const EMPTY_MESSAGE = "No major signals detected.";
 
@@ -421,7 +422,7 @@ function SignalSection({ title, label, items, toneClass }) {
   );
 }
 
-function ResearchSummary({ ticker, researchData, loading, error }) {
+function ResearchSummary({ ticker, researchData, loading, error, allowSave = true }) {
   const summary = researchData?.research_summary || {};
   const priceAnalysis = normalizeObject(summary.price_analysis);
   const newsSentiment = isPlainObject(summary.news_sentiment_analysis)
@@ -501,8 +502,17 @@ function ResearchSummary({ ticker, researchData, loading, error }) {
           <Badge tone={getConfidenceTone(confidence).replace("tone-", "")}>
             Confidence: {confidence}
           </Badge>
+          {allowSave && (
+            <SaveResearchButton key={JSON.stringify([ticker, summary])} ticker={summary.ticker || ticker} content={summary} />
+          )}
         </div>
       </div>
+
+      {normalizeList(summary.warnings).length > 0 && (
+        <ul className="research-muted" aria-label="Research warnings">
+          {normalizeList(summary.warnings).map((warning, index) => <li key={index}>{warning}</li>)}
+        </ul>
+      )}
 
       <div className="research-insight-strip">
         <InsightItem

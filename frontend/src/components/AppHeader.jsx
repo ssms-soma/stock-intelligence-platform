@@ -21,6 +21,9 @@ function AppHeader() {
             <Link className="app-nav-link" to="/watchlist">
               Watchlist
             </Link>
+            <Link className="app-nav-link" to="/saved-research">
+              Saved Research
+            </Link>
             <span className="app-user-label" title={user?.email}>
               {userLabel}
             </span>

@@ -9,6 +9,7 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 from app.db.base import Base
 
 if TYPE_CHECKING:
+    from app.models.saved_research import SavedResearch
     from app.models.watchlist_item import WatchlistItem
 
 
@@ -44,6 +45,11 @@ class User(Base):
         server_default=func.now(),
     )
     watchlist_items: Mapped[list[WatchlistItem]] = relationship(
+        back_populates="user",
+        cascade="all, delete-orphan",
+        passive_deletes=True,
+    )
+    saved_research: Mapped[list[SavedResearch]] = relationship(
         back_populates="user",
         cascade="all, delete-orphan",
         passive_deletes=True,
