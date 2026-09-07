@@ -3,6 +3,18 @@ import { Link, Navigate } from "react-router-dom";
 import { deleteSavedResearch, fetchSavedResearch } from "../api/savedResearchApi";
 import useAuth from "../auth/useAuth";
 
+function formatSavedDate(value) {
+  const date = new Date(value);
+  if (!value || Number.isNaN(date.getTime())) return "Date unavailable";
+  return date.toLocaleString(undefined, {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+  });
+}
+
 function SavedResearch() {
   const { token, isAuthenticated, isLoading, logout } = useAuth();
   if (isLoading) return <main className="watchlist-page">Checking your session...</main>;
@@ -41,8 +53,9 @@ function SavedResearchList({ token, logout }) {
     return () => controller.abort();
   }, [logout, retry, token]);
 
-  async function handleDelete(id) {
+  async function handleDelete(id, title) {
     if (deleteControllers.current.has(id)) return;
+    if (!window.confirm(`Delete saved research “${title}”? This cannot be undone.`)) return;
     const controller = new AbortController();
     deleteControllers.current.set(id, controller);
     setDeleting((current) => [...current, id]);
@@ -65,7 +78,7 @@ function SavedResearchList({ token, logout }) {
   }
 
   return (
-    <main className="watchlist-page">
+    <main className="watchlist-page saved-research-page">
       <section className="watchlist-panel" aria-labelledby="saved-research-title">
         <p className="watchlist-eyebrow">Your research snapshots</p>
         <h1 id="saved-research-title">Saved Research</h1>
@@ -78,17 +91,19 @@ function SavedResearchList({ token, logout }) {
           }}>Retry</button>
         </div>}
         {!loading && !error && items.length === 0 && <div className="watchlist-empty">
-          <p>You have no saved research yet.</p><Link to="/">Find a stock to research</Link>
+          <p>You have no saved research yet.</p>
+          <p>Open a stock page and choose Save Research in the AI Research Summary.</p>
+          <Link to="/">Find a stock to research</Link>
         </div>}
         <div className="watchlist-grid">
           {items.map((item) => <article className="watchlist-card" key={item.id}>
             <strong>{item.ticker}</strong>
             <h2 className="saved-research-title">{item.title}</h2>
-            <time dateTime={item.created_at}>Saved {new Date(item.created_at).toLocaleString()}</time>
+            <time dateTime={item.created_at}>Saved {formatSavedDate(item.created_at)}</time>
             <div className="saved-research-actions">
               <Link to={`/saved-research/${item.id}`}>Open</Link>
               <button type="button" disabled={deleting.includes(item.id)}
-                onClick={() => handleDelete(item.id)} aria-label={`Delete ${item.title}`}>
+                onClick={() => handleDelete(item.id, item.title)} aria-label={`Delete ${item.title}`}>
                 {deleting.includes(item.id) ? "Deleting..." : "Delete"}
               </button>
             </div>

@@ -312,18 +312,65 @@ body {
 
 .saved-research-actions {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   justify-content: space-between;
   gap: 1rem;
 }
 
+.saved-research-actions a,
 .saved-research-actions button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+  min-height: 44px;
   border: 1px solid #dbe3ef;
   border-radius: 4px;
-  padding: 0.4rem 0.7rem;
+  padding: 0.55rem 0.85rem;
   background: #ffffff;
-  color: #b91c1c;
+  font: inherit;
+  text-decoration: none;
   cursor: pointer;
+}
+
+.saved-research-actions a {
+  color: #1d4ed8;
+}
+
+.saved-research-actions button {
+  color: #b91c1c;
+}
+
+.saved-research-actions a:focus-visible,
+.saved-research-actions button:focus-visible {
+  outline: 3px solid rgba(37, 99, 235, 0.25);
+  outline-offset: 2px;
+}
+
+.saved-research-page .watchlist-card {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.saved-research-page .watchlist-grid {
+  grid-template-columns: repeat(auto-fit, minmax(min(210px, 100%), 1fr));
+}
+
+.saved-research-page .watchlist-empty {
+  display: grid;
+  gap: 0.65rem;
+}
+
+.saved-research-detail h1 {
+  font-size: clamp(1.5rem, 4vw, 2rem);
+  line-height: 1.25;
+  letter-spacing: 0;
+  margin: 1.25rem 0 0.6rem;
+}
+
+.saved-research-control .watchlist-button.is-saved:disabled {
+  cursor: default;
 }
 
 .saved-research-actions button:disabled {
@@ -484,6 +531,7 @@ body {
   .app-nav {
     width: 100%;
     justify-content: flex-start;
+    flex-wrap: wrap;
   }
 
   .app-user-label {

@@ -54,7 +54,7 @@ function SaveControl({ ticker, content, token, isAuthenticated, isLoading, logou
 
   return (
     <div className="saved-research-control">
-      <button className="watchlist-button" type="button" onClick={handleSave}
+      <button className={`watchlist-button${saved && !pending ? " is-saved" : ""}`} type="button" onClick={handleSave}
         disabled={isLoading || pending || saved || !ticker}
         aria-live="polite">
         {pending ? "Saving..." : saved ? "Saved" : "Save Research"}

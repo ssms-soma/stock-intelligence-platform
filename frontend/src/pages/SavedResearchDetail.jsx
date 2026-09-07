@@ -4,6 +4,18 @@ import { fetchSavedResearchDetail } from "../api/savedResearchApi";
 import useAuth from "../auth/useAuth";
 import ResearchSummary from "../components/ResearchSummary";
 
+function formatSavedDate(value) {
+  const date = new Date(value);
+  if (!value || Number.isNaN(date.getTime())) return "Date unavailable";
+  return date.toLocaleString(undefined, {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+  });
+}
+
 function SavedResearchDetail() {
   const { id } = useParams();
   const location = useLocation();
@@ -50,7 +62,7 @@ function SavedDetail({ id, token, logout }) {
       {item && <>
         <h1>{item.title}</h1>
         <p className="watchlist-intro">Saved <time dateTime={item.created_at}>
-          {new Date(item.created_at).toLocaleString()}
+          {formatSavedDate(item.created_at)}
         </time></p>
         <ResearchSummary ticker={item.ticker} researchData={{ research_summary: item.content }} allowSave={false} />
       </>}
