@@ -447,6 +447,100 @@ body {
   overflow-wrap: anywhere;
 }
 
+.watchlist-list-page .watchlist-toolbar,
+.watchlist-list-page .watchlist-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+}
+
+.watchlist-list-page .watchlist-toolbar {
+  align-items: flex-end;
+  margin-top: 1.5rem;
+}
+
+.watchlist-list-page .watchlist-search {
+  display: grid;
+  flex: 1 1 280px;
+  min-width: 0;
+  gap: 0.55rem;
+}
+
+.watchlist-list-page .watchlist-search label {
+  color: #334155;
+  font-size: 0.88rem;
+  font-weight: 750;
+}
+
+.watchlist-list-page .watchlist-search input,
+.watchlist-list-page .watchlist-clear,
+.watchlist-list-page .watchlist-actions a,
+.watchlist-list-page .watchlist-actions button {
+  box-sizing: border-box;
+  min-height: 44px;
+  border: 1px solid #cbd5e1;
+  border-radius: 4px;
+  padding: 0.65rem 0.85rem;
+  background: #ffffff;
+  color: #1d4ed8;
+  font: inherit;
+}
+
+.watchlist-list-page .watchlist-search input {
+  width: 100%;
+  min-width: 0;
+  color: #0f172a;
+}
+
+.watchlist-list-page .watchlist-clear,
+.watchlist-list-page .watchlist-actions button {
+  cursor: pointer;
+}
+
+.watchlist-list-page .watchlist-actions a {
+  display: inline-flex;
+  align-items: center;
+  text-decoration: none;
+}
+
+.watchlist-list-page .watchlist-actions button,
+.watchlist-list-page .watchlist-remove-error {
+  color: #b91c1c;
+}
+
+.watchlist-list-page .watchlist-actions button:disabled {
+  opacity: 0.65;
+  cursor: wait;
+}
+
+.watchlist-list-page .watchlist-clear:hover,
+.watchlist-list-page .watchlist-actions a:hover,
+.watchlist-list-page .watchlist-actions button:hover:not(:disabled) {
+  border-color: #2563eb;
+}
+
+.watchlist-list-page input:focus-visible,
+.watchlist-list-page button:focus-visible,
+.watchlist-list-page a:focus-visible {
+  outline: 3px solid rgba(37, 99, 235, 0.25);
+  outline-offset: 2px;
+}
+
+.watchlist-list-page .watchlist-grid {
+  grid-template-columns: repeat(auto-fit, minmax(min(210px, 100%), 1fr));
+}
+
+.watchlist-list-page .watchlist-card {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.watchlist-list-page .watchlist-empty {
+  display: grid;
+  gap: 0.65rem;
+  overflow-wrap: anywhere;
+}
+
 .watchlist-control {
   display: grid;
   justify-items: end;
