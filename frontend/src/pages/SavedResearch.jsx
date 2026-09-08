@@ -91,7 +91,7 @@ function SavedResearchList({ token, logout }) {
     <main className="watchlist-page saved-research-page">
       <section className="watchlist-panel" aria-labelledby="saved-research-title">
         <p className="watchlist-eyebrow">Your research snapshots</p>
-        <h1 id="saved-research-title">Saved Research</h1>
+        <h1 id="saved-research-title">Saved Research{!loading && !error && items.length > 0 ? ` (${items.length})` : ""}</h1>
         <p className="watchlist-intro">Open research as it was when you saved it.</p>
         {!loading && !error && items.length > 0 && <div className="saved-research-toolbar">
           <div className="saved-research-search">

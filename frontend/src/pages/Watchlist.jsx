@@ -103,7 +103,7 @@ function Watchlist() {
     <main className="watchlist-page watchlist-list-page">
       <section className="watchlist-panel" aria-labelledby="watchlist-title">
         <p className="watchlist-eyebrow">Your saved stocks</p>
-        <h1 id="watchlist-title">Watchlist</h1>
+        <h1 id="watchlist-title">Watchlist{!loading && !error && items.length > 0 ? ` (${items.length})` : ""}</h1>
         <p className="watchlist-intro">
           Open a ticker to view its latest public market intelligence.
         </p>
