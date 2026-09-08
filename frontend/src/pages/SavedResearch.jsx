@@ -24,12 +24,22 @@ function SavedResearch() {
 
 function SavedResearchList({ token, logout }) {
   const [items, setItems] = useState([]);
+  const [query, setQuery] = useState("");
+  const searchInput = useRef(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [retry, setRetry] = useState(0);
   const [deleting, setDeleting] = useState([]);
   const [deleteErrors, setDeleteErrors] = useState({});
   const deleteControllers = useRef(new Map());
+
+  const normalizedQuery = query.trim().toLowerCase();
+  const filteredItems = normalizedQuery
+    ? items.filter((item) =>
+        item.ticker.toLowerCase().includes(normalizedQuery) ||
+        item.title.toLowerCase().includes(normalizedQuery)
+      )
+    : items;
 
   useEffect(() => {
     const controllers = deleteControllers.current;
@@ -83,6 +93,19 @@ function SavedResearchList({ token, logout }) {
         <p className="watchlist-eyebrow">Your research snapshots</p>
         <h1 id="saved-research-title">Saved Research</h1>
         <p className="watchlist-intro">Open research as it was when you saved it.</p>
+        {!loading && !error && items.length > 0 && <div className="saved-research-toolbar">
+          <div className="saved-research-search">
+            <label htmlFor="saved-research-search">Search saved research</label>
+            <input id="saved-research-search" ref={searchInput} type="search"
+              placeholder="Search by ticker or title" value={query}
+              onChange={(event) => setQuery(event.target.value)} />
+          </div>
+          {query.length > 0 && <button type="button" className="saved-research-clear"
+            onClick={() => {
+              setQuery("");
+              searchInput.current?.focus();
+            }}>Clear search</button>}
+        </div>}
         {loading && <p aria-live="polite">Loading saved research...</p>}
         {error && <div className="watchlist-error" role="alert">
           <p>{error}</p>
@@ -95,8 +118,13 @@ function SavedResearchList({ token, logout }) {
           <p>Open a stock page and choose Save Research in the AI Research Summary.</p>
           <Link to="/">Find a stock to research</Link>
         </div>}
+        {!loading && !error && items.length > 0 && <div role="status">
+          {filteredItems.length === 0 && <p className="watchlist-empty saved-research-filtered-empty">
+            No saved research matches your search.
+          </p>}
+        </div>}
         <div className="watchlist-grid">
-          {items.map((item) => <article className="watchlist-card" key={item.id}>
+          {filteredItems.map((item) => <article className="watchlist-card" key={item.id}>
             <strong>{item.ticker}</strong>
             <h2 className="saved-research-title">{item.title}</h2>
             <time dateTime={item.created_at}>Saved {formatSavedDate(item.created_at)}</time>
